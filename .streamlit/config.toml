@@ -1,9 +1,12 @@
 [theme]
-base = "dark"
-primaryColor = "#6ea8ff"
-backgroundColor = "#0b1020"
-secondaryBackgroundColor = "#101728"
-textColor = "#e8edf7"
+# Light is the default so the app reads well on a projector. A dark palette is available from
+# the Appearance control in the sidebar; both are styled in scamshield/ui.py.
+base = "light"
+primaryColor = "#2563eb"
+backgroundColor = "#f3f6fc"
+secondaryBackgroundColor = "#eef3fb"
+textColor = "#16223a"
+font = "sans serif"
 
 [server]
 headless = true

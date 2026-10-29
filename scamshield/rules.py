@@ -34,6 +34,9 @@ class Hit:
     why: str
     evidence: list[str] = field(default_factory=list)
     raw_evidence: list[str] = field(default_factory=list)
+    # Set by the learning layer when a rule's weight was adjusted from user feedback.
+    multiplier: float = 1.0
+    learned_note: str = ""
 
 
 RULES: tuple[Rule, ...] = (

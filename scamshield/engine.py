@@ -16,6 +16,8 @@ from pathlib import Path
 
 import requests
 
+from . import learning
+from .entities import Entity, assess_with_trust
 from .rules import RULES, Hit, prescan, rule_score
 
 SKILL_PATH = Path(__file__).resolve().parent.parent / "skills" / "job-scam-detector" / "SKILL.md"
@@ -146,6 +148,7 @@ class Flag:
     source: str = "ai"  # ai | rules | both
     code: str = ""  # taxonomy code; empty for restored rule flags
     corroborated: bool = False  # a rule matched the same family
+    learned_note: str = ""  # set when user feedback adjusted the rule behind this flag
 
 
 @dataclass
@@ -167,6 +170,11 @@ class Analysis:
     rule_hits: list[Hit] = field(default_factory=list)
     error: str | None = None
     discarded_claims: int = 0  # model flags dropped because they could not be verified
+    # Added by the analyse() wrapper: contact points, message memory, learning notes.
+    entities: list[Entity] = field(default_factory=list)
+    similar: list[learning.SimilarCase] = field(default_factory=list)
+    learn_notes: list[str] = field(default_factory=list)
+    verdict_id: int | None = None
 
 
 # --------------------------------------------------------------------------------------
@@ -469,6 +477,7 @@ def _flags_from_hits(hits: list[Hit]) -> list[Flag]:
             source="rules",
             code=h.key,
             corroborated=True,
+            learned_note=h.learned_note,
         )
         for h in hits
     ]
@@ -520,10 +529,13 @@ def _rules_only(
     )
 
 
-def analyze(message: str, model: str = "", use_ai: bool = True) -> Analysis:
+def _run(message: str, model: str = "", use_ai: bool = True, use_learning: bool = True) -> Analysis:
     """Analyse a message. Falls back to the rules engine if the LLM is unavailable."""
     started = time.perf_counter()
     hits = prescan(message)
+    learn_notes: list[str] = []
+    if use_learning and message.strip():
+        hits, learn_notes = learning.apply_to_hits(hits, message)
     base_score = rule_score(hits)
 
     if not message.strip():
@@ -642,4 +654,26 @@ def analyze(message: str, model: str = "", use_ai: bool = True) -> Analysis:
 
     result.latency_ms = int((time.perf_counter() - started) * 1000)
     result.rule_hits = hits
+    result.learn_notes = learn_notes
+    return result
+
+
+def analyze(
+    message: str,
+    model: str = "",
+    use_ai: bool = True,
+    use_learning: bool = True,
+) -> Analysis:
+    """Public entry point: the verdict plus contact-point analysis and message memory.
+
+    The learning layer only touches rule weights and adds clearly-labelled taught phrases; it
+    never loosens the verification rules applied to the language model.
+    """
+    result = _run(message, model=model, use_ai=use_ai, use_learning=use_learning)
+    if message.strip():
+        result.entities = assess_with_trust(message)
+        if use_learning:
+            result.similar = learning.similar_cases(message)
+    if not result.learn_notes and any(h.multiplier != 1.0 for h in result.rule_hits):
+        result.learn_notes = [h.learned_note for h in result.rule_hits if h.learned_note]
     return result
