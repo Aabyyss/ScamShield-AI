@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scamshield import engine  # noqa: E402
 from scamshield.engine import _level_for  # noqa: E402
 from scamshield.rules import prescan, rule_score  # noqa: E402
 from scamshield.samples import SAMPLES, SAMPLE_BY_KEY  # noqa: E402
@@ -89,6 +90,96 @@ class TestScoring(unittest.TestCase):
         self.assertEqual(_level_for(30), "MEDIUM")
         self.assertEqual(_level_for(64), "MEDIUM")
         self.assertEqual(_level_for(65), "HIGH")
+
+
+class TestModelGuardrails(unittest.TestCase):
+    """The model must never be able to invent a verdict the text does not support."""
+
+    def run_with_payload(self, sample_key: str, payload: dict):
+        original = engine.call_model
+        engine.call_model = lambda *a, **k: payload  # type: ignore[assignment]
+        try:
+            return engine.analyze(SAMPLE_BY_KEY[sample_key].text, model="test-model")
+        finally:
+            engine.call_model = original  # type: ignore[assignment]
+
+    def test_invented_payment_flag_is_discarded(self) -> None:
+        payload = {
+            "headline": "This is a scam.",
+            "summary": "The sender demands a fee.",
+            "red_flags": [
+                {
+                    "code": "upfront_payment",
+                    "title": "Requests payment before contract",
+                    "evidence": "send Rs 50,000 today to confirm your seat",
+                    "why_it_matters": "Fees are never charged.",
+                    "severity": "critical",
+                }
+            ],
+        }
+        result = self.run_with_payload("legit_offer", payload)
+        self.assertEqual(result.risk_level, "LOW")
+        self.assertEqual(result.red_flags, [])
+        self.assertEqual(result.discarded_claims, 1)
+
+    def test_no_fee_sentence_is_not_a_payment_demand(self) -> None:
+        payload = {
+            "headline": "Payment requested",
+            "summary": "A fee is mentioned.",
+            "red_flags": [
+                {
+                    "code": "upfront_payment",
+                    "title": "Mentions payment",
+                    "evidence": "No payment or fee of any kind is required at any stage",
+                    "why_it_matters": "Fees are a scam signal.",
+                    "severity": "critical",
+                }
+            ],
+        }
+        result = self.run_with_payload("legit_offer", payload)
+        self.assertEqual(result.discarded_claims, 1)
+        self.assertEqual(result.risk_level, "LOW")
+
+    def test_uncorroborated_high_is_downgraded(self) -> None:
+        payload = {
+            "headline": "Unrealistic salary",
+            "summary": "Pay looks high.",
+            "red_flags": [
+                {
+                    "code": "unrealistic_pay",
+                    "title": "Unrealistic salary",
+                    "evidence": "Annual salary: PKR 1,800,000",
+                    "why_it_matters": "Too high for the role.",
+                    "severity": "critical",
+                }
+            ],
+        }
+        result = self.run_with_payload("legit_offer", payload)
+        self.assertEqual(result.red_flags[0].severity, "medium")
+        self.assertEqual(result.risk_level, "LOW")
+        self.assertLessEqual(result.risk_score, 15)
+
+    def test_model_flags_never_lower_a_rule_verdict(self) -> None:
+        payload = {
+            "verdict": "likely_legitimate",
+            "risk_level": "LOW",
+            "risk_score": 5,
+            "headline": "Looks fine.",
+            "summary": "Nothing concerning.",
+            "red_flags": [],
+        }
+        result = self.run_with_payload("dubai_hotel", payload)
+        self.assertEqual(result.risk_level, "HIGH")
+        self.assertEqual(result.risk_score, 100)
+
+    def test_quote_without_ellipsis_still_verifies(self) -> None:
+        text = "Visa processing fee: Rs 35,000 only"
+        self.assertTrue(
+            engine._quote_verified("Visa processing fee: Rs 35,000", engine._normalise(text), engine._tokens(text))
+        )
+        self.assertFalse(
+            engine._quote_verified("a completely invented sentence", engine._normalise(text), engine._tokens(text))
+        )
 
 
 if __name__ == "__main__":

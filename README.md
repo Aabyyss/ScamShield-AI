@@ -71,16 +71,32 @@ python -m scamshield.cli "paste any message here" --no-ai
                  └───────────────────┬──────────────────────────┘
                                      │ verdict + flags + advice
                  ┌───────────────────▼──────────────────────────┐
-                 │ 3. MERGE  (scamshield/engine.py)             │
-                 │    score = max(rules, model)                  │
-                 │    restore any critical flag the model missed │
+                 │ 3. VERIFY & SCORE  (scamshield/engine.py)    │
+                 │    every model flag needs a quote in the text │
+                 │    rules own the flags + severity + score     │
                  └──────────────────────────────────────────────┘
 ```
 
 **Why both layers.** Rules alone are brittle ("CNIC" isn't always fraud). A model alone can be
-talked out of a verdict by a polite scammer. Together: the model explains, the rules guarantee
-that a payment demand can never be waved through. The final score is the higher of the two,
-so the model can only ever make the verdict stricter, never softer.
+talked out of a verdict by a polite scammer — or, at 1B parameters, invent one. Together: the
+rules assign the score and the model explains it.
+
+### Guardrails against a small model
+
+A tiny local model is not a frontier model, so the architecture assumes it will sometimes be
+wrong. Four checks run before any model output reaches the screen:
+
+1. **Taxonomy or nothing.** Each flag must carry a `code` from the twelve-family taxonomy. Free-form
+   accusations are discarded.
+2. **Quote or nothing.** The `evidence` must be found in the message (exact match, or ≥75% token
+   overlap after normalisation). A hallucinated quote kills the flag.
+3. **No invented payment.** A payment claim is discarded when its own quote denies payment
+   ("no payment or fee of any kind is required") — the failure mode we hit while building this.
+4. **Rules certify severity.** A `critical`/`high` claim is downgraded to `medium` unless the rules
+   engine independently matched the same family, and model findings add at most 15 points to the
+   deterministic score. A lone model opinion can never reach HIGH.
+
+Every discarded claim is counted and shown in the result footer — useful on stage, and honest.
 
 ### The Agent Skill
 
@@ -99,7 +115,8 @@ changes without touching Python.
 | 🟢 LOW | 0–29 | No scam pattern found. Still verify independently. |
 
 A single **critical** family (upfront fee, private wallet, guaranteed visa, document request)
-floors the score at 82 — by design, one decisive signal beats five weak ones.
+floors the score at 82 — by design, one decisive signal beats five weak ones. The score itself is
+deterministic: rule weights, plus at most 5 points per verified model finding (capped at 15).
 
 ---
 
@@ -137,20 +154,37 @@ in [`tests/test_rules.py`](tests/test_rules.py) — run `python -m unittest disc
 
 ## Performance on a CPU-only laptop
 
-Measured on this machine (no GPU, Ollama 0.40, Python 3.14):
+Measured on this machine (no GPU, Ollama 0.40, Python 3.14, 8 threads):
 
 | Path | Time | Notes |
 |---|---|---|
-| Rules engine only | **< 0.1 s** | Shown instantly in the UI |
-| `llama3.2` (3B) full verdict | ~4 min | Usable for testing, too slow for stage |
-| `gemma3:1b` full verdict | see below | Recommended for the demo: pull it, keep it warm |
+| Rules engine only | **< 0.1 s** | Rendered immediately in the UI |
+| `gemma3:1b` full verdict | **~65–95 s** | Recommended demo model; ~320-word runtime brief |
+| `llama3.2` (3B) full verdict | ~4 min | Best judgement, too slow for stage |
 
-The UI deliberately renders the rules verdict first, then upgrades it with the model's
-reasoning. The model stays loaded for 30 minutes (`keep_alive`) so a demo never pays the
-~16 s cold-start twice. If you need a hard guarantee on stage, set `SCAMSHIELD_MODEL` to the
-small model you benchmarked and run one warm-up analysis before you present.
+Three optimisations make the small model usable, and each is a lesson worth telling judges:
+
+- **Instant first paint.** The UI renders the deterministic verdict while the model works, then
+  upgrades the explanation in place. The audience never waits for a spinner.
+- **A compact runtime brief.** SKILL.md is a 2,500-token playbook for humans; the engine sends a
+  320-word projection marked `<!-- runtime:start/end -->` inside the same file. One source of
+  truth, a fraction of the prompt processing.
+- **Stop at the closing brace.** Ollama streams; the client stops generation the moment the JSON
+  object balances, and salvages complete fields if a small model rambles past the token cap.
+
+The model stays loaded for 30 minutes (`keep_alive`) so a demo never pays the ~16 s cold start
+twice. For a hard guarantee on stage, set `SCAMSHIELD_MODEL` and run one warm-up analysis first.
 
 ---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Sidebar says *Ollama offline* | Run `ollama serve`, then refresh the browser. |
+| Analysis returns instantly with a warning | The model failed or timed out; the verdict is rules-only and still correct. Try `gemma3:1b`. |
+| `AttributeError` in `dataclasses` after editing files | Streamlit hot-reloaded mid-import. Refresh the browser; `runOnSave` is off by default for this reason. |
+| Very slow first analysis | The model is loading (~16 s). The UI warms it at startup; keep the app open before you present. |
 
 ## Project layout
 
@@ -179,8 +213,10 @@ Environment variables:
 
 - **It reads text, not people.** A patient scammer who avoids every pattern can pass. The
   verdict is a second opinion, not a guarantee.
-- **Small local models are weaker than frontier models.** On CPU, quality and speed trade off;
-  the rules engine exists partly to compensate.
+- **Small local models are weaker than frontier models.** `gemma3:1b` invents claims under
+  pressure — during development it flagged a genuine offer letter as a payment scam. That is
+  exactly why the verification layer exists; expect noisy flags from the model and treat its
+  prose as an explanation, not evidence.
 - **Not a legal or financial authority.** It never claims a company is fake — only that a
   message behaves like fraud.
 - **Urdu/Roman-Urdu is only partly covered.** The rule patterns are English-first; a

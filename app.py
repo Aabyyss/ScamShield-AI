@@ -6,12 +6,13 @@ Run with:  streamlit run app.py
 from __future__ import annotations
 
 import html
+import threading
 
 import streamlit as st
 
-import scamshield
 from scamshield import engine
-from scamshield.samples import SAMPLES, SAMPLE_BY_KEY
+from scamshield.engine import Analysis
+from scamshield.samples import SAMPLES
 
 st.set_page_config(
     page_title="ScamShield AI — Job Scam Detector",
@@ -82,8 +83,6 @@ st.markdown(
   .step p { color: #a9b8d0; font-size: .87rem; line-height: 1.5; margin: 0; }
 
   .meta { color: #7f8faa; font-size: .78rem; margin-top: 14px; }
-  div[data-testid="stMetricValue"] { color: #e8edf7; }
-  .stButton > button { border-radius: 10px; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -96,6 +95,132 @@ def esc(value: object) -> str:
 
 def load_sample(text: str) -> None:
     st.session_state["message"] = text
+    st.session_state.pop("result", None)
+
+
+def clear_result() -> None:
+    st.session_state.pop("result", None)
+
+
+def render_result(result: Analysis, provisional: bool = False) -> None:
+    """Draw a verdict. Called twice per run: instantly from rules, then from the model."""
+    cls, color, guidance = RISK_STYLE.get(result.risk_level, RISK_STYLE["LOW"])
+    verdict_label = {
+        "scam": "This is almost certainly a scam.",
+        "suspicious": "This message is suspicious.",
+        "likely_legitimate": "No scam pattern detected.",
+        "unclear": "Not enough to judge.",
+    }.get(result.verdict, result.verdict.replace("_", " ").capitalize())
+
+    st.markdown(
+        f"""
+<div class="risk-banner {cls}">
+  <div>
+    <div class="level" style="color:{color}">{esc(result.risk_level)} RISK</div>
+    <div class="sub">{esc(verdict_label)} {esc(guidance)}</div>
+  </div>
+  <div class="score" style="color:{color}">{result.risk_score}<small>/100</small></div>
+</div>
+<div class="meter"><div style="width:{result.risk_score}%;background:{color}"></div></div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(f"#### {esc(result.headline)}")
+    if result.summary:
+        st.markdown(
+            f'<p style="color:#c3cfe2;font-size:.98rem;line-height:1.65">{esc(result.summary)}</p>',
+            unsafe_allow_html=True,
+        )
+
+    if provisional:
+        st.caption("⚡ Verdict from the rules engine, already final on the critical signals. The local model is adding its reasoning…")
+    elif result.error:
+        st.warning(f"AI engine message: {result.error}")
+
+    col_flags, col_actions = st.columns([1.35, 1])
+
+    with col_flags:
+        heading = "🚩 Red flags" if result.risk_level != "LOW" else "🚩 Concerns raised (unverified)"
+        st.markdown(f"##### {heading} ({len(result.red_flags)})")
+        if result.red_flags:
+            cards = []
+            for flag in result.red_flags:
+                quote = (
+                    f'<div class="quote">“{esc(flag.evidence)}”</div>' if flag.evidence else ""
+                )
+                cards.append(
+                    f'<div class="flag {esc(flag.severity)}">'
+                    f'<div class="top"><span class="title">{esc(flag.title)}</span>'
+                    f'<span class="sev">{esc(flag.severity)}</span></div>'
+                    f"{quote}"
+                    f'<div class="why">{esc(flag.why_it_matters)}</div>'
+                    f"</div>"
+                )
+            st.markdown("".join(cards), unsafe_allow_html=True)
+        else:
+            st.success("The message shows none of the known scam patterns.")
+
+        if result.positive_signals:
+            st.markdown("##### ✅ What looks legitimate")
+            for item in result.positive_signals:
+                st.markdown(f"- {esc(item)}")
+
+    with col_actions:
+        st.markdown("##### ✅ What to do now")
+        actions = result.recommended_actions or [
+            "Do not send money or documents until you verify the employer."
+        ]
+        st.markdown(
+            "".join(
+                f'<div style="display:flex;gap:10px;margin-bottom:11px;color:#dbe4f2;'
+                f'font-size:.9rem;line-height:1.5">'
+                f'<span style="color:#6ea8ff;font-weight:700">{i}.</span>'
+                f"<span>{esc(a)}</span></div>"
+                for i, a in enumerate(actions, 1)
+            ),
+            unsafe_allow_html=True,
+        )
+
+        if result.questions_to_ask:
+            st.markdown("##### 🎯 Ask them this")
+            st.markdown(
+                "".join(
+                    f'<div style="color:#a9b8d0;font-size:.86rem;margin-bottom:8px;'
+                    f'line-height:1.5">↳ {esc(q)}</div>'
+                    for q in result.questions_to_ask
+                ),
+                unsafe_allow_html=True,
+            )
+
+    with st.expander("🔬 Evidence the rules engine matched"):
+        if result.rule_hits:
+            for hit in result.rule_hits:
+                st.markdown(
+                    f"**{esc(hit.label)}** · severity `{esc(hit.severity)}` · weight `{hit.weight}`"
+                )
+                for ev in hit.evidence:
+                    st.code(ev, language=None)
+        else:
+            st.caption("No deterministic pattern matched. The verdict rests on the model's reading.")
+
+    engine_label = (
+        f"🧠 {esc(result.model)} via Ollama (localhost)"
+        if result.engine == "ollama"
+        else "⚙️ rules engine only"
+    )
+    discarded = (
+        f" · 🛡️ {result.discarded_claims} unverified model claim(s) discarded"
+        if result.discarded_claims
+        else ""
+    )
+    st.markdown(
+        f'<div class="meta">{engine_label} · ⏱ {result.latency_ms / 1000:.1f}s · '
+        f"🚩 {len(result.rule_hits)} rule signal(s) · "
+        f"confidence: {esc(result.confidence)} · "
+        f"category: {esc(result.category.replace('_', ' '))}{discarded}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -111,13 +236,13 @@ with st.sidebar:
 
     if online and models:
         st.markdown(
-            f'<span class="pill ok">● Ollama connected</span> '
-            f'<span class="pill">127.0.0.1 only</span>',
+            '<span class="pill ok">● Ollama connected</span> '
+            '<span class="pill">127.0.0.1 only</span>',
             unsafe_allow_html=True,
         )
     elif online:
         st.markdown('<span class="pill warn">● Ollama up, no model</span>', unsafe_allow_html=True)
-        st.caption("Pull a model: `ollama pull gemma3:4b`")
+        st.caption("Pull a model: `ollama pull gemma3:1b`")
     else:
         st.markdown('<span class="pill warn">● Ollama offline</span>', unsafe_allow_html=True)
         st.caption("Start it with `ollama serve`. Rules engine still works.")
@@ -126,7 +251,7 @@ with st.sidebar:
         "Model",
         options=models or [default_model],
         index=(models.index(default_model) if default_model in models else 0),
-        help="Any local model works. Gemma is the project default; llama3.2 is a good fallback.",
+        help="Any local model works. Small models are far faster on CPU.",
     )
     use_ai = st.toggle("Use local AI", value=True, help="Off = deterministic rules engine only.")
 
@@ -149,6 +274,17 @@ with st.sidebar:
         "This app has no cloud dependency. Its only network call is to "
         f"`{engine.ollama_host()}`, which runs on this laptop. Disconnect Wi-Fi and it still works."
     )
+
+
+@st.cache_resource(show_spinner=False)
+def _warm_model(model_name: str) -> bool:
+    """Load the model once in the background so the first demo click is not slow."""
+    threading.Thread(target=engine.warmup, args=(model_name,), daemon=True).start()
+    return True
+
+
+if online and models:
+    _warm_model(model)
 
 # --------------------------------------------------------------------------------------
 # Header
@@ -184,6 +320,7 @@ with tab_scan:
             "e.g. “Dear Candidate, Dubai hotel job, visa fee Rs 35,000, send on JazzCash…”"
         ),
         label_visibility="collapsed",
+        on_change=clear_result,
     )
 
     left, right = st.columns([1, 3])
@@ -194,127 +331,30 @@ with tab_scan:
             "Your text is processed by the model on this machine. No upload, no logging, no cloud."
         )
 
+    slot = st.empty()
+
+    if not run and (previous := st.session_state.get("result")) is not None:
+        with slot.container():
+            render_result(previous)
+
     if run:
-        with st.spinner("Reading the message locally…"):
-            st.session_state["result"] = engine.analyze(
-                message, model=model, use_ai=use_ai and online
-            )
-        st.session_state["analysed_text"] = message
+        if not message.strip():
+            st.toast("Paste a message first.")
+        else:
+            # Phase 1 — deterministic verdict, available immediately.
+            fast = engine.analyze(message, use_ai=False)
+            st.session_state["result"] = fast
+            with slot.container():
+                render_result(fast, provisional=True)
 
-    result = st.session_state.get("result")
-    if result is not None:
-        st.divider()
-        cls, color, guidance = RISK_STYLE.get(result.risk_level, RISK_STYLE["LOW"])
-        verdict_label = {
-            "scam": "This is almost certainly a scam.",
-            "suspicious": "This message is suspicious.",
-            "likely_legitimate": "No scam pattern detected.",
-            "unclear": "Not enough to judge.",
-        }.get(result.verdict, result.verdict.replace("_", " ").capitalize())
-
-        st.markdown(
-            f"""
-<div class="risk-banner {cls}">
-  <div>
-    <div class="level" style="color:{color}">{esc(result.risk_level)} RISK</div>
-    <div class="sub">{esc(verdict_label)} {esc(guidance)}</div>
-  </div>
-  <div class="score" style="color:{color}">{result.risk_score}<small>/100</small></div>
-</div>
-<div class="meter"><div style="width:{result.risk_score}%;background:{color}"></div></div>
-""",
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(f"#### {esc(result.headline)}")
-        if result.summary:
-            st.markdown(
-                f'<p style="color:#c3cfe2;font-size:.98rem;line-height:1.65">{esc(result.summary)}</p>',
-                unsafe_allow_html=True,
-            )
-
-        if result.error:
-            st.warning(f"AI engine message: {result.error}")
-
-        col_flags, col_actions = st.columns([1.35, 1])
-
-        with col_flags:
-            st.markdown(f"##### 🚩 Red flags ({len(result.red_flags)})")
-            if result.red_flags:
-                cards = []
-                for flag in result.red_flags:
-                    quote = (
-                        f'<div class="quote">“{esc(flag.evidence)}”</div>'
-                        if flag.evidence
-                        else ""
-                    )
-                    cards.append(
-                        f'<div class="flag {esc(flag.severity)}">'
-                        f'<div class="top"><span class="title">{esc(flag.title)}</span>'
-                        f'<span class="sev">{esc(flag.severity)}</span></div>'
-                        f"{quote}"
-                        f'<div class="why">{esc(flag.why_it_matters)}</div>'
-                        f"</div>"
-                    )
-                st.markdown("".join(cards), unsafe_allow_html=True)
-            else:
-                st.success("The message shows none of the known scam patterns.")
-
-            if result.positive_signals:
-                st.markdown("##### ✅ What looks legitimate")
-                for item in result.positive_signals:
-                    st.markdown(f"- {esc(item)}")
-
-        with col_actions:
-            st.markdown("##### ✅ What to do now")
-            actions = result.recommended_actions or [
-                "Do not send money or documents until you verify the employer."
-            ]
-            st.markdown(
-                "".join(
-                    f'<div style="display:flex;gap:10px;margin-bottom:11px;color:#dbe4f2;'
-                    f'font-size:.9rem;line-height:1.5">'
-                    f'<span style="color:#6ea8ff;font-weight:700">{i}.</span>'
-                    f"<span>{esc(a)}</span></div>"
-                    for i, a in enumerate(actions, 1)
-                ),
-                unsafe_allow_html=True,
-            )
-
-            if result.questions_to_ask:
-                st.markdown("##### 🎯 Ask them this")
-                st.markdown(
-                    "".join(
-                        f'<div style="color:#a9b8d0;font-size:.86rem;margin-bottom:8px;'
-                        f'line-height:1.5">↳ {esc(q)}</div>'
-                        for q in result.questions_to_ask
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-        with st.expander("🔬 Evidence the rules engine matched"):
-            if result.rule_hits:
-                for hit in result.rule_hits:
-                    st.markdown(
-                        f"**{esc(hit.label)}** · severity `{esc(hit.severity)}` · weight `{hit.weight}`"
-                    )
-                    for ev in hit.evidence:
-                        st.code(ev, language=None)
-            else:
-                st.caption("No deterministic pattern matched. The verdict rests on the model's reading.")
-
-        engine_label = (
-            f"🧠 {esc(result.model)} via Ollama (localhost)"
-            if result.engine == "ollama"
-            else "⚙️ rules engine only"
-        )
-        st.markdown(
-            f'<div class="meta">{engine_label} · ⏱ {result.latency_ms / 1000:.1f}s · '
-            f"🚩 {len(result.rule_hits)} rule signal(s) · "
-            f"confidence: {esc(result.confidence)} · "
-            f"category: {esc(result.category.replace('_', ' '))}</div>",
-            unsafe_allow_html=True,
-        )
+            # Phase 2 — local model refines it in place.
+            if use_ai and online:
+                with st.spinner("Local AI is reading the message — nothing leaves this laptop…"):
+                    full = engine.analyze(message, model=model, use_ai=True)
+                st.session_state["result"] = full
+                slot.empty()
+                with slot.container():
+                    render_result(full)
 
 with tab_how:
     st.markdown("#### Three layers, one verdict")
@@ -325,7 +365,7 @@ with tab_how:
             "Deterministic evidence",
             "Twelve fraud patterns — upfront fees, personal wallets, guaranteed visas, identity "
             "harvesting, lookalike domains — scan the text and quote the exact words that matched. "
-            "No model can skip these.",
+            "No model can skip these, and they render in under a tenth of a second.",
         ),
         (
             "02 · AGENT SKILL",
@@ -335,10 +375,11 @@ with tab_how:
             "advice a human would give.",
         ),
         (
-            "03 · MERGE",
+            "03 · VERIFY & SCORE",
             "One defensible verdict",
-            "The final score is the higher of the rules score and the model's score. Any critical "
-            "signal the model missed is restored, so a fee demand can never be waved through.",
+            "Every model flag must carry a taxonomy code and a verbatim quote that is checked "
+            "against the message — unverifiable claims are discarded. Rules assign the score; "
+            "model findings can add at most 15 points, so no lone opinion can turn a message HIGH.",
         ),
     ]
     for col, (n, title, body) in zip(cols, steps):

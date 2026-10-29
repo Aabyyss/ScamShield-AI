@@ -7,7 +7,8 @@ textColor = "#e8edf7"
 
 [server]
 headless = true
-runOnSave = true
+# Off on purpose: hot-reloading mid-demo can re-import modules while the model is loaded.
+runOnSave = false
 
 [browser]
 gatherUsageStats = false
