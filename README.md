@@ -265,6 +265,18 @@ lenient.**
 
 ## Interface
 
+![ScamShield AI home screen](screenshots/app-home.png)
+
+*Light theme, with the onboarding dialog on first open:*
+
+![Onboarding dialog](screenshots/intro-dialog.png)
+
+*A scam verdict — every flag quotes the message:*
+
+![Verdict in light mode](screenshots/verdict-light.png)
+
+![Verdict in dark mode](screenshots/verdict-dark-final.png)
+
 - **Light theme by default**, designed for a projector: white cards, soft shadows, blue accent,
   readable quoted evidence. **Dark theme** is a full second palette, not an inversion.
 - **Welcome dialog** on first open explains the three-step flow and offers a scam example.

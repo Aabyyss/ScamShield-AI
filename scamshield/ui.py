@@ -152,6 +152,17 @@ def css(mode: str = "light") -> str:
     background: var(--ss-surface) !important; color: var(--ss-text) !important;
     border: 1px solid var(--ss-line) !important;
   }}
+  /* The selectbox paints its container with the base theme, leaving a light strip behind
+     the arrow in dark mode. */
+  [data-testid="stSelectbox"] > div,
+  [data-testid="stSelectbox"] [role="group"] {{
+    background: var(--ss-surface) !important;
+    border-radius: 12px !important;
+  }}
+  [data-testid="stSelectbox"] svg {{
+    fill: var(--ss-muted) !important;
+    color: var(--ss-muted) !important;
+  }}
   [data-baseweb="menu"] li {{ color: var(--ss-text) !important; }}
   [data-baseweb="menu"] li:hover {{ background: var(--ss-accent_soft) !important; }}
 
@@ -227,6 +238,13 @@ def css(mode: str = "light") -> str:
   }}
   [data-testid="stCode"] code, .stMarkdown pre code, .stMarkdown code {{
     color: var(--ss-text) !important; font-family: var(--ss-mono) !important;
+  }}
+  /* Inline code in captions inherits the base theme's light chip, which glares in dark mode. */
+  .stMarkdown :not(pre) > code {{
+    background: var(--ss-chip) !important;
+    border: 1px solid var(--ss-line) !important;
+    border-radius: 6px !important;
+    padding: 1px 5px !important;
   }}
   hr, [data-testid="stDivider"] {{ border-color: var(--ss-line) !important; }}
   [data-testid="stSpinner"] * {{ color: var(--ss-muted) !important; }}
@@ -512,7 +530,13 @@ def flags(flag_list: Iterable) -> str:
     cards = []
     for flag in flag_list:
         severity = _SEVERITY_CLASS.get(flag.severity, "medium")
-        source = "rule + AI" if flag.corroborated else ("rule" if flag.source == "rules" else "AI · unverified")
+        # Rules-only runs must not be labelled as if the model agreed with them.
+        if flag.source == "rules":
+            source = "rule"
+        elif flag.corroborated:
+            source = "rule + AI"
+        else:
+            source = "AI · unverified"
         quote = (
             f'<div class="ss-quote">“{esc(flag.evidence)}”</div>' if flag.evidence else ""
         )
