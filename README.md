@@ -1,6 +1,13 @@
-# 🛡️ ScamShield AI
+<img src="assets/logo.png" width="96" alt="ScamShield AI logo" align="left" />
 
-**Paste a job offer. Know if it's a scam — before you send a single rupee.**
+# ScamShield AI
+
+**Paste a job offer — or a screenshot of one. Know if it's a scam before you send a single rupee.**
+
+<br clear="left" />
+
+> **Full write-up:** [docs/PROJECT-REPORT.md](docs/PROJECT-REPORT.md) — architecture, every
+> library, the real bugs and how they were fixed, measurements and honest limitations.
 
 ScamShield is an offline AI agent that reads suspicious job messages (WhatsApp forwards,
 recruiter DMs, hiring emails) and returns a risk verdict with the exact red flags quoted from
@@ -84,6 +91,21 @@ Sources: [Bitdefender Scamio](https://www.bitdefender.com/en-us/consumer/scamio)
 ---
 
 ## Quickstart
+
+### One click (Windows, recommended)
+
+```text
+1. Double-click  setup_desktop.bat        (once — puts a shortcut on your Desktop)
+2. Double-click  “ScamShield AI”          (from now on)
+```
+
+The shortcut starts the local server, wakes Ollama, opens the browser and then steps aside; the
+app keeps running if you close the console. First launch installs the Python packages for you.
+No shortcut wanted? Double-click `ScamShield.bat`, or on macOS/Linux run `./launch.sh`.
+
+Launcher options: `python launcher.py --port 8600`, `--no-browser`, `--restart`, `--stop`.
+
+### Manual start
 
 ```bash
 # 1. Local model runtime (once)
@@ -290,6 +312,14 @@ Three optimisations make the small model usable:
 
 ```
 app.py                              Streamlit UI (5 tabs, onboarding, theme switch)
+launcher.py                         one-click launcher (deps, Ollama, port, browser)
+ScamShield.bat                      Windows double-click entry point
+setup_desktop.bat                   creates the Desktop shortcut for any collaborator
+launch.sh                           macOS / Linux entry point
+assets/                             logo, page icon and multi-size .ico
+tools/make_logo.py                  regenerates the logo and icon from code
+tools/create_shortcut.ps1           Windows shortcut creation with the custom icon
+docs/PROJECT-REPORT.md              full technical report
 scamshield/
   rules.py                          12 deterministic fraud families + scoring
   entities.py                       offline link / mailbox / phone / ID analysis
@@ -352,3 +382,6 @@ for personal data, and never phones home. Victims are told what to do next, not 
 ---
 
 Built for the Agent Skills hackathon. Local model: Google Gemma via Ollama.
+
+A collaborator only needs to clone the repository, install the requirements once (the launcher
+does it on first run) and run `setup_desktop.bat` to get the same one-click shortcut.

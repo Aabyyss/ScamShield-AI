@@ -5,9 +5,12 @@ Run with:  streamlit run app.py
 
 from __future__ import annotations
 
+import base64
 import threading
+from pathlib import Path
 
 import streamlit as st
+from PIL import Image
 
 from scamshield import engine, learning, ocr, ui
 from scamshield.entities import domains_in
@@ -17,9 +20,18 @@ from scamshield.rules import RULES
 from scamshield.samples import SAMPLES
 from scamshield.samples import SAMPLE_BY_KEY
 
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo.png"
+LOGO_B64 = base64.b64encode(LOGO_PATH.read_bytes()).decode() if LOGO_PATH.exists() else ""
+if LOGO_PATH.exists():
+    _logo = Image.open(LOGO_PATH)
+    _logo.load()
+    _page_icon: object = _logo
+else:
+    _page_icon = "🛡️"
+
 st.set_page_config(
     page_title="ScamShield AI — Job Scam Detector",
-    page_icon="🛡️",
+    page_icon=_page_icon,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -188,7 +200,7 @@ status_pills = [
 ]
 header_left, header_right = st.columns([5, 1.15], vertical_alignment="center")
 with header_left:
-    st.markdown(ui.hero(status_pills), unsafe_allow_html=True)
+    st.markdown(ui.hero(status_pills, LOGO_B64), unsafe_allow_html=True)
 with header_right:
     if st.button("❓ How to use", use_container_width=True, key="open_intro"):
         show_intro()

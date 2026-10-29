@@ -248,11 +248,12 @@ def css(mode: str = "light") -> str:
   /* ---------- hero ---------- */
   .ss-hero {{ display: flex; gap: 20px; align-items: center; padding: 6px 0 4px; }}
   .ss-shield {{
-    width: 64px; height: 64px; flex: 0 0 64px; display: grid; place-items: center;
-    font-size: 30px; border-radius: 20px;
+    width: 66px; height: 66px; flex: 0 0 66px; display: grid; place-items: center;
+    font-size: 30px; border-radius: 20px; overflow: hidden;
     background: linear-gradient(140deg, var(--ss-accent), var(--ss-accent2));
     box-shadow: 0 12px 28px var(--ss-accent_line);
   }}
+  .ss-shield img {{ width: 100%; height: 100%; display: block; object-fit: cover; }}
   .ss-eyebrow {{
     font-size: .68rem; letter-spacing: 2px; font-weight: 800;
     color: var(--ss-accent); text-transform: uppercase; margin-bottom: 4px;
@@ -428,13 +429,19 @@ def css(mode: str = "light") -> str:
 """
 
 
-def hero(status_pills: Sequence[tuple[str, str]] = ()) -> str:
+def hero(status_pills: Sequence[tuple[str, str]] = (), logo_b64: str = "") -> str:
     pills = "".join(
         f'<span class="ss-pill {esc(cls)}">{esc(text)}</span>' for text, cls in status_pills
     )
+    shield = (
+        f'<div class="ss-shield"><img src="data:image/png;base64,{logo_b64}" '
+        'alt="ScamShield AI logo"></div>'
+        if logo_b64
+        else '<div class="ss-shield">🛡️</div>'
+    )
     return f"""
 <div class="ss-hero">
-  <div class="ss-shield">🛡️</div>
+  {shield}
   <div>
     <div class="ss-eyebrow">Offline job-fraud detector</div>
     <h1>Know a job scam <span class="ss-grad">before you pay.</span></h1>
