@@ -21,6 +21,7 @@ with Wi-Fi switched off.
 |---|---|
 | **Quoted evidence** | Every red flag shows the exact words that triggered it and why it matters. No black box. |
 | **Instant first verdict** | The rules engine answers in under 0.1 s; the local model upgrades the explanation in place. |
+| **Screenshot input** | Only have a picture of the message? Local RapidOCR reads it on the device — no Tesseract install, no upload. |
 | **Link, mailbox and number checks** | Free mailboxes, look-alike brand domains, throwaway TLDs, shorteners, punycode, hidden digits — all offline. |
 | **A shareable report** | One click downloads a Markdown safety report with the quotes, so the next person doesn't pay. |
 | **It learns from you** | Correct a verdict and the rules that fired are re-weighted — bounded, visible, reversible. |
@@ -49,7 +50,7 @@ Checked against each product's own documentation (October 2026):
 | Capability | Scamio | Norton Genie | ScamAdviser | Truecaller | ScamShield |
 |---|---|---|---|---|---|
 | Paste text → verdict | ✅ | ✅ | Partial | — | ✅ |
-| Screenshot input | ✅ | ✅ | ✅ | — | Roadmap (OCR) |
+| Screenshot input | ✅ | ✅ | ✅ | — | ✅ local OCR |
 | Link / domain checks | ✅ live | ✅ live | ✅ 40+ sources | ✅ live | Offline heuristics |
 | Phone number lookup | — | — | — | ✅ | Masked-number detector |
 | Works fully offline | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -61,9 +62,10 @@ Checked against each product's own documentation (October 2026):
 
 What those tools do better, and what we chose:
 
-- **Screenshots.** Scamio and Norton accept them; victims usually have one. Local OCR
-  (Tesseract) is the top roadmap item: it fits the offline promise, but shipping a button that
-  fails on a judge's laptop is worse than an honest gap.
+- **Screenshots.** Scamio and Norton accept them; victims usually have one. ScamShield now
+  matches that with RapidOCR: the ONNX models ship inside the Python package, so
+  `pip install` is the only setup and the image never leaves the process. Printed text reads
+  well; handwriting and Urdu script still don't, and the app says so after each scan.
 - **Live reputation.** ScamAdviser, Truecaller and Scamio query maintained databases. That needs
   the network, so ScamShield judges link *structure* offline and says plainly that reputation was
   not checked.
@@ -99,6 +101,10 @@ streamlit run app.py
 
 The sidebar shows whether Ollama is reachable and which models are installed. If the model
 isn't running, the app still gives a verdict from the rules engine and says so plainly.
+
+Screenshot reading needs no extra system software: `rapidocr-onnxruntime` (in
+`requirements.txt`) bundles its own models and runs on CPU. `screenshots/whatsapp-demo.png`
+is a ready-made scam screenshot you can upload to try it.
 
 ### Command line (useful while building the skill)
 
@@ -241,6 +247,8 @@ lenient.**
   readable quoted evidence. **Dark theme** is a full second palette, not an inversion.
 - **Welcome dialog** on first open explains the three-step flow and offers a scam example.
   It is also reachable from **❓ How to use** at any time.
+- **Two input modes:** paste text, or upload a screenshot (PNG/JPG/WebP) and edit the text OCR
+  produces before it is analysed.
 - **Quick example chips** above the button, plus the fuller demo list in the sidebar.
 - **Tabs:** Check a message · How it works · Learning · Compare · Agent Skill.
 - Verdicts expose *why*: quoted evidence, entity reasons, rule weights, discarded AI claims.
@@ -254,6 +262,7 @@ Measured on this machine (no GPU, Ollama 0.40, Python 3.14, 8 threads):
 | Path | Time | Notes |
 |---|---|---|
 | Rules + entities only | **< 0.1 s** | Rendered immediately in the UI |
+| Screenshot OCR (RapidOCR) | **~4–7 s** | 1600 px upscale, 70-word card measured at 91% confidence |
 | `gemma3:1b` full verdict | **~65–95 s** | Recommended demo model; ~320-word runtime brief |
 | `llama3.2` (3B) full verdict | ~4 min | Best judgement, too slow for stage |
 
@@ -284,6 +293,7 @@ app.py                              Streamlit UI (5 tabs, onboarding, theme swit
 scamshield/
   rules.py                          12 deterministic fraud families + scoring
   entities.py                       offline link / mailbox / phone / ID analysis
+  ocr.py                            local screenshot reading (RapidOCR, Tesseract fallback)
   engine.py                         Ollama client, JSON contract, merge logic, fallback
   learning.py                       SQLite feedback store, Beta weights, phrases, memory
   report.py                         shareable Markdown safety report
@@ -291,7 +301,8 @@ scamshield/
   samples.py                        demo corpus with expected verdicts
   cli.py                            terminal interface for testing the pipeline
 skills/job-scam-detector/SKILL.md   the Agent Skill: playbook, taxonomy, JSON contract
-tests/                              38 regression tests (rules, entities, learning, report)
+tests/                              44 regression tests (rules, entities, learning, report, OCR)
+screenshots/whatsapp-demo.png       ready-made scam screenshot for trying OCR
 .streamlit/config.toml              light base theme, telemetry off
 data/scamshield.db                  local learning store (git-ignored)
 ```
@@ -315,7 +326,9 @@ Run the tests with `python -m unittest discover -s tests -v`.
 - **Small local models are weaker than frontier models.** `gemma3:1b` invents claims under
   pressure — during development it flagged a genuine offer letter as a payment scam. That is
   exactly why the verification layer exists.
-- **No screenshots yet.** OCR needs the Tesseract binary; it is the first roadmap item.
+- **OCR is good, not perfect.** Printed Latin text reads well, but handwriting, Urdu script,
+  heavy compression and cropped screenshots produce errors. That is why the extracted text lands
+  in an editable box before it is analysed.
 - **No live reputation data.** Link and number judgement is structural and offline, so it cannot
   know a domain was reported yesterday.
 - **Urdu/Roman-Urdu is only partly covered.** The rule patterns are English-first.
@@ -324,7 +337,8 @@ Run the tests with `python -m unittest discover -s tests -v`.
 
 ## Roadmap
 
-1. **Local OCR** for screenshots (Tesseract) — the most common real-world input.
+1. **Urdu and handwritten OCR** — RapidOCR covers printed Latin text; the scams students
+   actually receive often arrive as Urdu script or a photo of handwriting.
 2. **Roman-Urdu patterns** (`paisay bhejain`, `visa guarantee`, `ghar baithe kamai`).
 3. **A local reputation cache** built from messages the user has already judged, labelled as
    cached and possibly stale.

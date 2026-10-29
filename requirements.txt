@@ -1,2 +1,6 @@
 streamlit>=1.36
 requests>=2.31
+pillow>=10
+# Local OCR for screenshots. Ships its own ONNX models (~12 MB wheel + opencv/onnxruntime),
+# works fully offline, and needs no Tesseract binary.
+rapidocr-onnxruntime>=1.2

@@ -9,7 +9,7 @@ import threading
 
 import streamlit as st
 
-from scamshield import engine, learning, ui
+from scamshield import engine, learning, ocr, ui
 from scamshield.entities import domains_in
 from scamshield.engine import Analysis
 from scamshield.report import build_report, report_filename
@@ -38,6 +38,8 @@ st.markdown(ui.css(mode_key), unsafe_allow_html=True)
 
 def load_sample(text: str) -> None:
     st.session_state["message"] = text
+    # Jump back to the text view so the loaded sample is visible.
+    st.session_state["input_mode"] = "⌨️ Paste text"
     st.session_state.pop("result", None)
     st.session_state.pop("verdict_id", None)
 
@@ -56,8 +58,9 @@ def clear_result() -> None:
 def show_intro() -> None:
     st.markdown(
         """
-**1. Paste the message.** The WhatsApp forward, the recruiter DM, the "visa processing"
-email — exactly as you received it, names and all.
+**1. Paste the message — or upload the screenshot.** The WhatsApp forward, the recruiter DM,
+the "visa processing" email, exactly as you received it. If you only have a picture, switch to
+**🖼️ Screenshot** and ScamShield reads the text on this laptop.
 
 **2. Read the verdict.** You get a risk level, every red flag quoted word-for-word, and a
 plain-language reason for each one. The rules verdict appears instantly; the local AI adds its
@@ -378,9 +381,9 @@ def render_empty_state() -> None:
             [
                 (
                     "STEP 1",
-                    "Paste the whole message",
+                    "Paste it — or upload a screenshot",
                     "Forward, DM or email — include the sender address and any link. "
-                    "The more of it we see, the better the evidence.",
+                    "Only have a picture? Switch to Screenshot; the text is read on this laptop.",
                 ),
                 (
                     "STEP 2",
@@ -417,14 +420,80 @@ tab_scan, tab_how, tab_learn, tab_compare, tab_skill = st.tabs(
 )
 
 with tab_scan:
+    input_mode = st.segmented_control(
+        "Input mode",
+        options=["⌨️ Paste text", "🖼️ Screenshot"],
+        key="input_mode",
+        default="⌨️ Paste text",
+        label_visibility="collapsed",
+    )
+    shot_mode = "Screenshot" in (input_mode or "")
+
+    if shot_mode:
+        if ocr.available():
+            upload = st.file_uploader(
+                "Screenshot of the message",
+                type=["png", "jpg", "jpeg", "webp"],
+                key="screenshot",
+                help="PNG, JPG or WebP up to 12 MB. The image is read on this laptop and never uploaded.",
+            )
+            if upload is not None:
+                data = upload.getvalue()
+                signature = (upload.name, len(data))
+                if st.session_state.get("ocr_signature") != signature:
+                    st.session_state["ocr_signature"] = signature
+                    st.session_state.pop("ocr_meta", None)
+                    with st.spinner("Reading the screenshot on this laptop…"):
+                        try:
+                            shot = ocr.extract(data)
+                        except ocr.OCRError as exc:
+                            st.session_state["ocr_error"] = str(exc)
+                        else:
+                            st.session_state.pop("ocr_error", None)
+                            st.session_state["message"] = shot.text
+                            st.session_state["ocr_meta"] = {
+                                "engine": shot.engine,
+                                "ms": shot.duration_ms,
+                                "confidence": shot.mean_confidence,
+                                "words": shot.word_count,
+                                "warnings": shot.warnings,
+                            }
+                            clear_result()
+
+                meta = st.session_state.get("ocr_meta")
+                if meta:
+                    confidence = meta["confidence"]
+                    st.caption(
+                        f"📷 Read with {meta['engine']} in {meta['ms'] / 1000:.1f}s · "
+                        f"{meta['words']} words"
+                        + (f" · mean confidence {confidence:.0%}" if confidence else "")
+                    )
+                    for warning in meta["warnings"]:
+                        st.warning(warning)
+                    with st.expander("🔍 The screenshot it read", expanded=False):
+                        st.image(upload, use_container_width=True)
+                if st.session_state.get("ocr_error"):
+                    st.error(st.session_state["ocr_error"])
+        else:
+            st.info(
+                "Screenshot reading needs the local OCR engine, which is not installed here. "
+                f"Run `{ocr.install_hint()}` and restart the app — it bundles its own models and "
+                "works offline. You can still paste the text below."
+            )
+
     message = st.text_area(
-        "Suspicious message",
+        "Text read from the screenshot" if shot_mode else "Suspicious message",
         key="message",
         height=210,
         placeholder=(
-            "Paste the WhatsApp message, email or DM here…\n\n"
-            "e.g. “Dear Candidate, Dubai hotel job, visa processing fee Rs 35,000, "
-            "send on JazzCash…”"
+            "The text from your screenshot appears here — fix anything OCR got wrong, "
+            "then press Analyse."
+            if shot_mode
+            else (
+                "Paste the WhatsApp message, email or DM here…\n\n"
+                "e.g. “Dear Candidate, Dubai hotel job, visa processing fee Rs 35,000, "
+                "send on JazzCash…”"
+            )
         ),
         label_visibility="collapsed",
         on_change=clear_result,
@@ -446,7 +515,8 @@ with tab_scan:
         run = st.button("Analyse message", type="primary", use_container_width=True)
 
     st.caption(
-        "Your text is processed by the model on this machine. No upload, no logging, no cloud."
+        "Your text — and any screenshot you upload — is processed on this machine. "
+        "No upload, no logging, no cloud."
     )
 
     slot = st.empty()
@@ -534,6 +604,15 @@ with tab_how:
 4. **Rules certify severity.** Critical families must be rule-proven, and model findings add at
    most 15 points — so no lone AI opinion can turn a message HIGH.
 """
+    )
+
+    st.markdown("##### Screenshots, without the cloud")
+    st.markdown(
+        "Most victims have a screenshot, not text they can copy. The 🖼️ Screenshot tab runs "
+        "RapidOCR locally — the ONNX models ship inside the Python package, so there is no system "
+        "binary and no download at runtime. The extracted text lands in an editable box, because "
+        "OCR is never perfect: you fix it before the verdict is issued, and the image itself is "
+        "never written to disk by the app."
     )
 
     st.markdown("##### Why not just ask a cloud chatbot?")
@@ -682,12 +761,12 @@ with tab_compare:
     st.markdown("#### How ScamShield compares")
     st.caption(
         "Capabilities checked against each tool's own documentation (October 2026). "
-        "“—”, “Offline” and “Roadmap” are deliberate product choices, not gaps we overlooked."
+        "“—” and “Offline” are deliberate product choices, not gaps we overlooked."
     )
     headers = ["Capability", "Scamio", "Norton Genie", "ScamAdviser", "Truecaller", "ScamShield"]
     rows = [
         ["Paste text and get a verdict", "✅", "✅", "Partial", "—", "✅"],
-        ["Screenshot / image input", "✅", "✅", "✅", "—", "Roadmap (OCR)"],
+        ["Screenshot input", "✅", "✅", "✅", "—", "✅ local OCR"],
         ["Link & domain checks", "✅ live", "✅ live", "✅ 40+ sources", "✅ live", "Offline heuristics"],
         ["Phone number lookup", "—", "—", "—", "✅", "Masked-number detector"],
         ["Works fully offline", "❌", "❌", "❌", "❌", "✅"],
@@ -704,9 +783,9 @@ with tab_compare:
     st.markdown("##### What they do better — and what we did about it")
     st.markdown(
         """
-- **Scamio and Norton accept screenshots.** Victims usually have a screenshot, not text. We
-  keep OCR on the roadmap: Tesseract is a local binary, so it fits the offline promise, but
-  shipping a button that fails on a judge's laptop would be worse than an honest gap.
+- **Scamio and Norton accept screenshots.** We now match that with RapidOCR: models ship inside
+  the package, so `pip install` is the only setup and the image never leaves the process. Printed
+  text reads well; handwriting and Urdu script still don't, and the app says so after each scan.
 - **Scamio, ScamAdviser and Truecaller check live reputation.** That needs the network. Instead
   ScamShield analyses the *structure* of every link, mailbox and number offline — free mailbox,
   look-alike brand domain, disposable TLD, punycode, hidden digits — and says plainly that
@@ -723,9 +802,10 @@ with tab_compare:
     st.markdown("##### Roadmap, in the order we would build it")
     st.markdown(
         """
-1. **Local OCR** for screenshots (Tesseract), so the most common input format works offline.
-2. **Roman-Urdu patterns** — the scams students actually receive mix Urdu transliteration with
-   English, and the current rules are English-first.
+1. **Urdu and handwritten OCR** — RapidOCR covers printed Latin text; the scams students
+   actually receive often arrive as Urdu script or a photo of handwriting.
+2. **Roman-Urdu patterns** — the messages mix Urdu transliteration with English, and the current
+   rules are English-first.
 3. **A local reputation cache** — domains and numbers from messages the user has already judged,
    labelled as cached and possibly stale, never presented as live data.
 4. **A one-page PDF** built from the Markdown report, for sharing on WhatsApp.
