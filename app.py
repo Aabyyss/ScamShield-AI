@@ -128,7 +128,7 @@ with st.sidebar:
         )
     elif online:
         st.markdown('<span class="ss-pill warn">● Ollama up, no model</span>', unsafe_allow_html=True)
-        st.caption("Pull a model: `ollama pull gemma3:1b`")
+        st.caption("Pull a model: `ollama pull gemma4:e2b`")
     else:
         st.markdown('<span class="ss-pill warn">● Ollama offline</span>', unsafe_allow_html=True)
         st.caption("Start it with `ollama serve`. The rules engine still works.")
@@ -145,7 +145,7 @@ with st.sidebar:
         help="Off = instant deterministic verdict, no model call.",
     )
     if models:
-        st.caption(f"Tip: `gemma3:1b` takes ~60–90s on a CPU laptop. The verdict never waits for it.")
+        st.caption(f"Tip: Gemma 4 E2B takes ~1–2 min on a CPU laptop. The verdict never waits for it.")
 
     st.divider()
     st.markdown("#### 🧪 Demo messages")

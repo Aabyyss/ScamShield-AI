@@ -22,8 +22,14 @@ from .rules import RULES, Hit, prescan, rule_score
 
 SKILL_PATH = Path(__file__).resolve().parent.parent / "skills" / "job-scam-detector" / "SKILL.md"
 
-# Models we prefer if the user has not chosen one. Gemma first, per the project brief.
+# Models we prefer if the user has not chosen one. Gemma 4 first: the project targets the
+# "Best use of Gemma 4" category, and E2B/E4B are the edge variants that fit an 8 GB laptop.
+DEFAULT_MODEL = "gemma4:e2b"
 PREFERRED_MODELS = (
+    "gemma4:e2b",
+    "gemma4:e4b",
+    "gemma4",
+    "gemma4:latest",
     "gemma3:4b",
     "gemma3",
     "gemma3:1b",
@@ -102,7 +108,7 @@ def pick_model(available: list[str]) -> str:
         for low, original in lowered.items():
             if low.split(":")[0] == candidate.lower().split(":")[0]:
                 return original
-    return available[0] if available else "gemma3:4b"
+    return available[0] if available else DEFAULT_MODEL
 
 
 def warmup(model: str, timeout: float = 180.0) -> bool:
@@ -324,6 +330,10 @@ def call_model(message: str, hits: list[Hit], model: str, timeout: float = 300.0
         "stream": True,
         "format": "json",
         "keep_alive": "30m",
+        # Gemma 4 and other reasoning models stream a separate `thinking` field first. On a CPU
+        # that reasoning can eat the whole token budget before the JSON starts, so it is off
+        # for this task: the playbook already tells the model what to look for.
+        "think": False,
         "options": {
             "temperature": 0.1,
             "top_p": 0.9,
@@ -334,6 +344,7 @@ def call_model(message: str, hits: list[Hit], model: str, timeout: float = 300.0
     }
 
     chunks: list[str] = []
+    thought: list[str] = []
     state = {"in_string": False, "escape": False, "started": False}
     depth = 0
 
@@ -349,7 +360,10 @@ def call_model(message: str, hits: list[Hit], model: str, timeout: float = 300.0
                     chunk = json.loads(line)
                 except ValueError:
                     continue
-                piece = (chunk.get("message") or {}).get("content", "")
+                body = chunk.get("message") or {}
+                if body.get("thinking"):
+                    thought.append(body["thinking"])
+                piece = body.get("content", "")
                 if piece:
                     chunks.append(piece)
                     depth, started = _brace_delta(piece, state, depth)
@@ -363,7 +377,12 @@ def call_model(message: str, hits: list[Hit], model: str, timeout: float = 300.0
         raise EngineError(f"Cannot reach Ollama at {ollama_host()}: {exc}") from exc
 
     content = "".join(chunks)
-    if not content:
+    if not content.strip():
+        # A model that ignored think:false may have put its whole answer in `thinking`.
+        salvage = "".join(thought)
+        if "{" in salvage:
+            content = salvage[salvage.find("{") :]
+    if not content.strip():
         raise EngineError("Ollama returned an empty response.")
     # A cut-off answer is still useful: the verdict, summary and advice come first.
     return _extract_json(content)

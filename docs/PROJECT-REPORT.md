@@ -6,9 +6,9 @@
 |---|---|
 | **Project** | ScamShield AI — The Job Scam Detector |
 | **Repository** | [github.com/Aabyyss/ScamShield-AI](https://github.com/Aabyyss/ScamShield-AI) |
-| **Built for** | Agent Skills hackathon |
+| **Built for** | Agent Skills hackathon — *Best use of Gemma 4* category |
 | **Report date** | 30 October 2026 |
-| **Stack** | Python 3.14 · Streamlit · Ollama (Gemma 3 1B) · RapidOCR/ONNX · SQLite |
+| **Stack** | Python 3.14 · Streamlit · Ollama (Gemma 4 E2B) · RapidOCR/ONNX · SQLite |
 | **Tests** | 44 automated tests, all passing |
 | **Status** | Working end to end; verified on a CPU-only Windows laptop |
 
@@ -35,7 +35,7 @@ forward to warn the next person. It runs with Wi-Fi switched off, costs nothing 
 gets measurably better as the user corrects it.
 
 The core design decision is that **the scoring is deterministic and the language model only
-explains**. A 1B-parameter model running on a CPU is not trustworthy enough to decide whether
+explains**. A small edge model running on a CPU is not trustworthy enough to decide whether
 someone should send money, but it is very good at turning evidence into plain language. Separating
 those two jobs is what makes the verdict defensible.
 
@@ -105,7 +105,7 @@ Build a scam classifier that is:
                       │  1. rules.prescan()        12 fraud families  │
                       │  2. learning.apply_to_hits()  weights/phrases │
                       │  3. entities.assess()       links, mail, IDs  │
-                      │  4. Ollama / Gemma          explanation      │
+                      │  4. Ollama / Gemma 4        explanation      │
                       │  5. verification            quotes + severity │
                       │  6. scoring                 deterministic     │
                       └───────────────┬───────────────────────────────┘
@@ -265,7 +265,7 @@ inside a collapsible block (so the user keeps their own record).
 | **Python** | 3.14 | Everything | Available on the laptop; fast enough; huge library support |
 | **Streamlit** | 1.66.1 | UI | Fastest path to a working, styled app; built-in dialog, segmented control, file uploader, download button |
 | **Ollama** | local service | Model runtime | One-command local models, streaming API, keeps the model warm, no Python ML stack needed |
-| **Google Gemma 3 1B** | 806 MB | Explanation layer | Matches the hackathon brief; small enough for CPU inference in ~90 s |
+| **Google Gemma 4 E2B** | 3.5 GB (q4) | Explanation layer | The target model for the *Best use of Gemma 4* category. E2B is the edge variant, so it fits an 8 GB CPU laptop; E4B / 12B / 26B-A4B run unchanged on a bigger machine |
 | **requests** | 2.31+ | Ollama HTTP client | Streaming support with a simple API |
 | **SQLite** (`sqlite3`) | stdlib | Learning store | Zero setup, transactional, single file, perfect for a desktop app |
 | **Pillow** | 13.0 | Image handling, logo generation | Reliable decoding, resizing, EXIF handling, and drawing the logo/icon without design tools |
@@ -276,7 +276,19 @@ inside a collapsible block (so the user keeps their own record).
 | **PowerShell + WScript.Shell** | Windows | Desktop shortcut | Native `.lnk` creation with a custom icon |
 | **Git / GitHub** | — | Version control | Collaboration and submission |
 
-### 7.1 Deliberately rejected
+### 7.1 Why Gemma 4, specifically
+
+| Property | Why it matters here |
+|---|---|
+| **Edge-first E2B / E4B variants** | The judge's laptop is the deployment target, not a GPU box. E2B runs offline on 8 GB of RAM, which is what makes the "turn off the Wi-Fi" demo possible at all |
+| **Structured JSON output** | The engine asks for one JSON object and validates every field; Gemma 4 follows the schema closely enough that the guardrails rarely have to throw an answer away |
+| **Multimodal input (text + image)** | The screenshot path already exists via RapidOCR. Gemma 4 can read the image directly, which is the obvious next step for handwriting and Urdu script — we do **not** claim it today, because the current release routes images through OCR |
+| **Runs through Ollama** | No Python ML stack, no PyTorch download, one command to install, and the model stays warm between checks |
+
+Model choice is a one-line change: `SCAMSHIELD_MODEL=gemma4:e4b` or the sidebar dropdown. Nothing
+in the scoring or the guardrails depends on which Gemma 4 size is used.
+
+### 7.2 Deliberately rejected
 
 | Option | Why not |
 |---|---|
@@ -307,7 +319,7 @@ The model is treated as an unreliable narrator. Its output passes four gates:
 Additional structural safeguards:
 
 - Rules own the flags for any family they matched; the model may only add **new** families. This
-  removed incoherent duplicate flags produced by the 1B model.
+  removed incoherent duplicate flags produced by the 1B model the project started on.
 - A LOW verdict cannot carry an alarmist headline or a scam-worded summary.
 - Discarded claims are counted and shown in the result footer.
 
@@ -360,18 +372,19 @@ These are real failures from the build, not hypotheticals.
 |---|---|---|---|---|
 | 1 | CLI crashed printing results on Windows | Console is cp1252; output contains `→` and `“”` | Reconfigure stdout to UTF-8 at CLI start | CLI prints cleanly |
 | 2 | Genuine offer flagged as identity harvesting | Rule reacted to "bring your CNIC copy" (normal at a Pakistani interview) | Require a *send/share/upload* verb near the document, not mere mention | `test_bringing_cnic_to_interview_is_not_harvesting` |
-| 3 | Genuine Systems Limited offer returned **HIGH** | 1B model invented a payment demand for a letter that says "no fee" | Entire verification layer: taxonomy codes, quote verification, no-fee polarity check, severity certification, 15-point cap | `legit_offer` now LOW; `test_invented_payment_flag_is_discarded` |
+| 3 | Genuine Systems Limited offer returned **HIGH** | The Gemma 3 1B model we started on invented a payment demand for a letter that says "no fee" | Entire verification layer: taxonomy codes, quote verification, no-fee polarity check, severity certification, 15-point cap | `legit_offer` now LOW; `test_invented_payment_flag_is_discarded` |
 | 4 | Dubai analysis returned malformed JSON after 118 s | Model hit `num_predict` cap mid-object (`done_reason: length`) | Stream and stop at the balanced closing brace; salvage complete fields if truncated | JSON parses; latency down |
-| 5 | Every call took ~4 minutes | Prompt was the full 2,524-token playbook | Added a 320-word `runtime:` section inside SKILL.md, parsed at runtime | Prompt ~320 words, ~65–95 s |
-| 6 | Model produced incoherent flags (wrong code/title pairs, duplicates) | 1B model cannot follow a large schema reliably | Rules own flags; model may only add new families; its prose is kept | Dubai flags now coherent |
+| 5 | Every call took ~4 minutes | Prompt was the full 2,524-token playbook | Added a 320-word `runtime:` section inside SKILL.md, parsed at runtime | Prompt ~320 words; 76–126 s on Gemma 4 E2B |
+| 6 | Model produced incoherent flags (wrong code/title pairs, duplicates) | A 1B model cannot follow a large schema reliably | Rules own flags; model may only add new families; its prose is kept | Dubai flags now coherent |
 | 7 | Model could lower a critical verdict | Model verdict was trusted | Rules assign score; model adds ≤15 points; critical floor at 82 | `test_model_flags_never_lower_a_rule_verdict` |
 | 8 | Correcting the same verdict inflated rule statistics | `ON CONFLICT` updated the feedback row but added stats again | Reverse the previous label's contribution, then apply the new one | `test_repeated_feedback_replaces_instead_of_stacking` |
 | 9 | Test suite failed deleting temp DBs on Windows | SQLite connections were never closed | `_session()` context manager: commit, close in `finally` | 44/44 pass, temp dirs clean up |
-| 10 | Risk badges rendered dark instead of red | Global `.stMarkdown span` colour rule outranked component classes | Narrowed the global selector to structural text only | Computed badge colour now `#cf2a20` / `#ff7a7a` |
-| 11 | OCR collapsed word spaces (`SendfeeonJazzCash`) | RapidOCR loses spacing on small renders; rules match on `\b` boundaries | Upscale to 1600 px before recognition | 900 px → collapsed; 1600 px → correct sentence |
-| 12 | New dev server said "port 8501 is not available" | A stale Streamlit process still held the port | Launcher records PID/port in `data/launcher.json`, reuses a healthy server, and reports conflicts | `launcher.py --restart` verified |
-| 13 | Random `AttributeError` in dataclasses during editing | Streamlit hot-reload re-imported modules mid-save | `runOnSave = false` in config; refresh instead | Stable sessions |
-| 14 | Download button key collisions | Same widget key across reruns with different results | Key includes the verdict id | No duplicate-key errors |
+| 10 | Gemma 4 returned "Ollama returned an empty response" after 180 s | Gemma 4 is a reasoning model: it streams its chain of thought into a separate `message.thinking` field, and on CPU that reasoning used the whole token budget before any JSON was emitted | Send `think: false` in the Ollama payload; if `content` is still empty, salvage the JSON from `thinking` | `engine=ollama` on all five samples, 76–126 s |
+| 11 | Risk badges rendered dark instead of red | Global `.stMarkdown span` colour rule outranked component classes | Narrowed the global selector to structural text only | Computed badge colour now `#cf2a20` / `#ff7a7a` |
+| 12 | OCR collapsed word spaces (`SendfeeonJazzCash`) | RapidOCR loses spacing on small renders; rules match on `\b` boundaries | Upscale to 1600 px before recognition | 900 px → collapsed; 1600 px → correct sentence |
+| 13 | New dev server said "port 8501 is not available" | A stale Streamlit process still held the port | Launcher records PID/port in `data/launcher.json`, reuses a healthy server, and reports conflicts | `launcher.py --restart` verified |
+| 14 | Random `AttributeError` in dataclasses during editing | Streamlit hot-reload re-imported modules mid-save | `runOnSave = false` in config; refresh instead | Stable sessions |
+| 15 | Download button key collisions | Same widget key across reruns with different results | Key includes the verdict id | No duplicate-key errors |
 
 ---
 
@@ -398,6 +411,47 @@ python -m unittest discover -s tests -v
 (no golden LLM snapshots — it is non-deterministic), real WhatsApp screenshots (synthetic renders
 are used), load or concurrency testing.
 
+### 11.4 What the "dataset" actually is — and is not
+
+This project does **not** have a dataset in the statistical sense, and the report should not be
+read as claiming measured accuracy.
+
+| What exists | Size | Origin | Can support an accuracy claim? |
+|---|---|---|---|
+| Demo corpus (`scamshield/samples.py`) | 5 messages (90, 94, 74, 120, 75 words) | Written by the team to exercise the 12 rule families | **No** |
+| Unit tests | 44 tests | Hand-written inputs, including fragments of the demo corpus | **No** |
+| OCR fixtures | 2 rendered PNG cards | Generated with Pillow, not captured from WhatsApp | **No** |
+| Real user messages | 0 | — | — |
+
+The five messages cover three scam variants, one genuine offer letter and one borderline case.
+They are realistic in style and Pakistan-specific detail, but they were **written alongside the
+rules**. That makes the corpus checks regression tests — they prove the rules still fire as
+designed — rather than held-out evaluation. A model tuned this way can look perfect on its own
+corpus and still miss a real message with different wording.
+
+**What *is* genuinely verified:** the deterministic layers behave as specified on known inputs;
+the guardrails block specific model failures (invented payment, unverified quote, severity
+inflation, verdict lowering); OCR reads printed Latin text; no message text reaches the database.
+Those are correctness properties, not accuracy measurements.
+
+**Known coverage bias:** English-first wording, Pakistan-specific payment rails (JazzCash,
+EasyPaisa), overseas-employment framing, and printed text. Roman-Urdu, Urdu script, purely local
+job scams, and novel fee structures are underrepresented or absent.
+
+**What a defensible evaluation would need:**
+
+1. 200+ consented, anonymised real messages from WhatsApp, email and DMs, with personal data
+   removed before storage.
+2. Two independent annotators labelling each message as scam / suspicious / legitimate against a
+   written rubric, with disagreements adjudicated.
+3. A held-out split never used while editing rules or prompts.
+4. Reporting precision, recall and F1 per band, plus the **false-positive rate on legitimate
+offer letters**, which is the number that decides whether users trust the tool.
+5. Separate results by channel and language, and a real-screenshot OCR word-error rate.
+
+The local feedback store already captures the labels a user assigns to real messages. With consent
+and anonymisation, those corrections are the natural seed for that dataset.
+
 ---
 
 ## 12. Performance (measured on the development laptop)
@@ -407,7 +461,7 @@ CPU-only, no GPU, 8 threads, Ollama 0.40, Python 3.14:
 | Path | Time | Notes |
 |---|---|---|
 | Rules + entities only | ~0.007 s | Rendered immediately; CLI measured 7 ms |
-| `gemma3:1b` full verdict | 65–95 s | Recommended demo model |
+| `gemma4:e2b` full verdict | 76–126 s (median 94 s) | Default model, measured over the five demo messages; Gemma 4 at q4, thinking disabled |
 | `llama3.2` (3B) full verdict | ~4 min | Better prose, unusable on stage |
 | Screenshot OCR | 3.3 s module / 6.3 s in UI | 70-word card at 91% mean confidence |
 | Model warm-up | ~16 s | Done in a background thread at startup |
@@ -443,7 +497,7 @@ without any setup.
 | Limitation | Impact | Mitigation |
 |---|---|---|
 | AI layer takes 65–95 s on CPU | The explanation lags the verdict | Rules verdict is instant; the UI says the model is still reading |
-| 1B model is weak | Noisy or contradictory prose | Guardrails; flags and score come from rules |
+| Small local models are weak | Gemma 4 E2B is far stronger than the 1B model we began with, but it is still not a frontier model and can write noisy prose | Guardrails; flags and score come from rules |
 | OCR reads printed Latin text well, handwriting and Urdu poorly | A photographed Urdu message may fail | Editable transcription box; confidence shown; Urdu OCR on roadmap |
 | No live reputation data | Cannot know a domain was reported yesterday | Structural checks; the UI states reputation was not checked |
 | Brand-lookalike list is 14 companies | New brands are missed | Generic hyphen/free-mail/risky-TLD rules still fire |
@@ -470,6 +524,7 @@ without any setup.
 | Launcher is Windows-first | macOS/Linux get `launch.sh`, no desktop icon | Documented |
 | Shortcut stores the interpreter path | Moving Python or deleting `.venv` breaks it | Re-run `setup_desktop.bat` |
 | Tests do not cover the UI or model quality | Regressions possible in those areas | Manual browser checks; deterministic layers fully tested |
+| Evaluation corpus is 5 synthetic messages | No accuracy, precision or recall claim is possible | Stated openly in §11.4; real-message evaluation is the next step |
 | No PDF export, no messaging integration | Cannot act inside WhatsApp | Downloadable Markdown report |
 | Python 3.10+ required | Slightly narrows compatibility | Stated in README |
 

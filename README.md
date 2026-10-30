@@ -110,8 +110,8 @@ Launcher options: `python launcher.py --port 8600`, `--no-browser`, `--restart`,
 ```bash
 # 1. Local model runtime (once)
 #    https://ollama.com/download  →  then:
-ollama pull gemma3:1b        # ~815 MB, fast on CPU
-# or: ollama pull llama3.2   # better judgement, slower on CPU
+ollama pull gemma4:e2b       # ~3.5 GB, Gemma 4 edge model, runs on 8 GB RAM
+# or: ollama pull gemma4:e4b  # ~6 GB, better judgement if you have the headroom
 
 # 2. App
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -297,7 +297,7 @@ Measured on this machine (no GPU, Ollama 0.40, Python 3.14, 8 threads):
 |---|---|---|
 | Rules + entities only | **< 0.1 s** | Rendered immediately in the UI |
 | Screenshot OCR (RapidOCR) | **~4–7 s** | 1600 px upscale, 70-word card measured at 91% confidence |
-| `gemma3:1b` full verdict | **~65–95 s** | Recommended demo model; ~320-word runtime brief |
+| `gemma4:e2b` full verdict | **~76–126 s** (median 94 s) | Default model; ~320-word runtime brief, thinking disabled |
 | `llama3.2` (3B) full verdict | ~4 min | Best judgement, too slow for stage |
 
 Three optimisations make the small model usable:
@@ -315,7 +315,7 @@ Three optimisations make the small model usable:
 | Symptom | Fix |
 |---|---|
 | Sidebar says *Ollama offline* | Run `ollama serve`, then refresh the browser. |
-| Analysis returns instantly with a warning | The model failed or timed out; the verdict is rules-only and still correct. Try `gemma3:1b`. |
+| Analysis returns instantly with a warning | The model failed or timed out; the verdict is rules-only and still correct. Try `gemma4:e2b`. |
 | Very slow first analysis | The model is loading (~16 s). The app warms it at startup. |
 | Learning tab is empty after a correction | A rule needs three labelled messages before its weight moves; that is by design. |
 | `AttributeError` in `dataclasses` after editing files | Streamlit hot-reloaded mid-import. Refresh; `runOnSave` is off for this reason. |
@@ -365,9 +365,9 @@ Run the tests with `python -m unittest discover -s tests -v`.
 
 - **It reads text, not people.** A patient scammer who avoids every pattern can pass. The
   verdict is a second opinion, not a guarantee.
-- **Small local models are weaker than frontier models.** `gemma3:1b` invents claims under
-  pressure — during development it flagged a genuine offer letter as a payment scam. That is
-  exactly why the verification layer exists.
+- **Small local models are weaker than frontier models.** Gemma 4 E2B still invents claims under
+  pressure — during development a 1B-class model flagged a genuine offer letter as a payment
+  scam. That is exactly why the verification layer exists, and why it stays on for every model.
 - **OCR is good, not perfect.** Printed Latin text reads well, but handwriting, Urdu script,
   heavy compression and cropped screenshots produce errors. That is why the extracted text lands
   in an editable box before it is analysed.
@@ -393,7 +393,8 @@ for personal data, and never phones home. Victims are told what to do next, not 
 
 ---
 
-Built for the Agent Skills hackathon. Local model: Google Gemma via Ollama.
+Built for the Agent Skills hackathon — *Best use of Gemma 4* category. Local model: Google
+Gemma 4 (E2B by default) via Ollama.
 
 A collaborator only needs to clone the repository, install the requirements once (the launcher
 does it on first run) and run `setup_desktop.bat` to get the same one-click shortcut.
