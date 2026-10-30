@@ -9,7 +9,7 @@
 | **Built for** | Agent Skills hackathon — *Best use of Gemma 4* category |
 | **Report date** | 30 October 2026 |
 | **Stack** | Python 3.14 · Streamlit · Ollama (Gemma 4 E2B) · RapidOCR/ONNX · SQLite |
-| **Tests** | 44 automated tests, all passing |
+| **Tests** | 47 automated tests, all passing |
 | **Status** | Working end to end; verified on a CPU-only Windows laptop |
 
 ![ScamShield AI logo](../assets/logo.png)
@@ -78,7 +78,8 @@ Build a scam classifier that is:
 1. **Open** — double-click the desktop shortcut. The launcher starts the local server and opens
    the browser; the first run also installs dependencies and wakes Ollama.
 2. **Onboarding** — a three-step welcome dialog explains what to paste, what they will see, and
-   why it is private. It can be reopened from **❓ How to use**.
+   why it is private. It can be reopened from **❓ How to use**. Immediately after it, a second
+   dialog asks permission for on-device learning, naming what is stored and what is never stored.
 3. **Input** — paste text, or switch to **🖼️ Screenshot** and upload a picture. OCR extracts the
    text into an editable box so mistakes can be fixed before analysis.
 4. **Verdict** — the rules engine answers in milliseconds: risk band, score out of 100, and each
@@ -240,8 +241,15 @@ below 0.6 the app warns that words may be wrong.
 
 ### 6.5 Learning
 
-Covered in detail in §8. In the UI: a **Learning** tab with per-rule precision, taught phrases,
+Covered in detail in §8 and §9. In the UI: an explicit consent dialog on first run, then a
+**Learning** tab with an on/off switch, the store path, per-rule precision, taught phrases,
 trusted domains, recent checks and two reset buttons.
+
+Nothing is written to the SQLite store until the user answers the consent dialog, and the
+sidebar always states which mode it is in — counts when learning is on, "Learning is off" when it
+is not, and the actual error if the store cannot be opened. A scan is saved the moment the rules
+verdict appears, not when the model finishes, so the counter moves immediately; the AI phase then
+refines the same row via `update_verdict()` rather than adding a second one.
 
 ### 6.6 Report export
 
@@ -252,7 +260,8 @@ inside a collapsible block (so the user keeps their own record).
 ### 6.7 Interface
 
 - Light theme by default (projector-friendly), dark theme as a full second palette.
-- Onboarding dialog, empty-state guide, quick example chips.
+- Onboarding dialog, learning-consent dialog, empty-state guide, quick example chips.
+- Visible learning state: counts when on, a labelled "off" state, or the store error.
 - Comparison tab with competitor capabilities and sources.
 - Everything offline: no fonts, images or scripts fetched from the internet.
 
@@ -327,6 +336,20 @@ Additional structural safeguards:
 
 ## 9. Self-learning design
 
+### 9.0 Consent gate
+
+![Learning consent dialog](../screenshots/consent-dialog.png)
+
+Learning is off until it is explicitly allowed. On first run the app asks, listing exactly what is
+stored (level, score, rule keys, a 64-bit fingerprint, corrections, taught phrases) and what is
+not (message text, CNIC or account numbers, anything leaving the machine). It also states plainly
+that ScamShield never reads WhatsApp or any other app's files — learning only uses messages the
+user pastes or uploads, plus the corrections they click. The choice is stored as a row in the
+`settings` table, is reversible from the Learning tab, and is enforced inside
+`learning.record_verdict()`, so no other code path can bypass it. `consent_choice()` returns
+`None` for a new install, which is what triggers the dialog; tests cover both the unasked and
+declined cases.
+
 ### 9.1 Rule precision
 
 For each rule that fired, the store keeps `scams` and `legit` counts from user corrections.
@@ -378,19 +401,21 @@ These are real failures from the build, not hypotheticals.
 | 6 | Model produced incoherent flags (wrong code/title pairs, duplicates) | A 1B model cannot follow a large schema reliably | Rules own flags; model may only add new families; its prose is kept | Dubai flags now coherent |
 | 7 | Model could lower a critical verdict | Model verdict was trusted | Rules assign score; model adds ≤15 points; critical floor at 82 | `test_model_flags_never_lower_a_rule_verdict` |
 | 8 | Correcting the same verdict inflated rule statistics | `ON CONFLICT` updated the feedback row but added stats again | Reverse the previous label's contribution, then apply the new one | `test_repeated_feedback_replaces_instead_of_stacking` |
-| 9 | Test suite failed deleting temp DBs on Windows | SQLite connections were never closed | `_session()` context manager: commit, close in `finally` | 44/44 pass, temp dirs clean up |
+| 9 | Test suite failed deleting temp DBs on Windows | SQLite connections were never closed | `_session()` context manager: commit, close in `finally` | 47/47 pass, temp dirs clean up |
 | 10 | Gemma 4 returned "Ollama returned an empty response" after 180 s | Gemma 4 is a reasoning model: it streams its chain of thought into a separate `message.thinking` field, and on CPU that reasoning used the whole token budget before any JSON was emitted | Send `think: false` in the Ollama payload; if `content` is still empty, salvage the JSON from `thinking` | `engine=ollama` on all five samples, 76–126 s |
 | 11 | Risk badges rendered dark instead of red | Global `.stMarkdown span` colour rule outranked component classes | Narrowed the global selector to structural text only | Computed badge colour now `#cf2a20` / `#ff7a7a` |
 | 12 | OCR collapsed word spaces (`SendfeeonJazzCash`) | RapidOCR loses spacing on small renders; rules match on `\b` boundaries | Upscale to 1600 px before recognition | 900 px → collapsed; 1600 px → correct sentence |
 | 13 | New dev server said "port 8501 is not available" | A stale Streamlit process still held the port | Launcher records PID/port in `data/launcher.json`, reuses a healthy server, and reports conflicts | `launcher.py --restart` verified |
 | 14 | Random `AttributeError` in dataclasses during editing | Streamlit hot-reload re-imported modules mid-save | `runOnSave = false` in config; refresh instead | Stable sessions |
 | 15 | Download button key collisions | Same widget key across reruns with different results | Key includes the verdict id | No duplicate-key errors |
+| 16 | Choosing "Enable learning" in the consent dialog silently ended up off | The Learning tab's switch kept its own session value and re-persisted `False` on the next rerun, overwriting the stored choice | The switch is only persisted by an `on_change` callback, and its state is re-synced whenever the stored consent changes | Consent survives; `test_nothing_is_stored_without_consent` guards the store side |
+| 17 | "Messages checked" stayed at 0 while the model was reading | The scan was recorded only after the AI phase finished, so on a 90-second Gemma 4 run the counter looked static | Record the rules verdict immediately, then `update_verdict()` the same row with the model result | Counter moves on the first render; caption shows "saved as scan #N" |
 
 ---
 
 ## 11. Testing
 
-**44 tests, all passing**, run with:
+**47 tests, all passing**, run with:
 
 ```bash
 python -m unittest discover -s tests -v
@@ -419,7 +444,7 @@ read as claiming measured accuracy.
 | What exists | Size | Origin | Can support an accuracy claim? |
 |---|---|---|---|
 | Demo corpus (`scamshield/samples.py`) | 5 messages (90, 94, 74, 120, 75 words) | Written by the team to exercise the 12 rule families | **No** |
-| Unit tests | 44 tests | Hand-written inputs, including fragments of the demo corpus | **No** |
+| Unit tests | 47 tests | Hand-written inputs, including fragments of the demo corpus | **No** |
 | OCR fixtures | 2 rendered PNG cards | Generated with Pillow, not captured from WhatsApp | **No** |
 | Real user messages | 0 | — | — |
 
@@ -509,7 +534,7 @@ without any setup.
 | Limitation | Impact | Mitigation |
 |---|---|---|
 | No authentication, single-user desktop model | Not safe for shared or hosted deployment | Bind to `127.0.0.1`; documented as a desktop app |
-| Learning DB is unencrypted | Local level/fingerprint history readable by the OS user | No message text stored; CNIC masked in output |
+| Learning DB is unencrypted | Local level/fingerprint history readable by the OS user | Nothing is written until the user consents; no message text stored; CNIC masked in output; the store can be cleared from the Learning tab |
 | Trusted-domain allowlist can be abused | A scammer using a trusted domain gets dampened signals | Dampening only; critical families keep their floor; documented as a preference, not proof |
 | Report includes the pasted message | Sharing the report shares the text | User-initiated only; message is inside a collapsible block |
 | Feedback could be poisoned | A malicious user could dampen a rule | Single-user threat model; bounded weights; reset; critical floor |

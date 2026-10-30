@@ -165,8 +165,15 @@ img { max-width: 100%; }
 .gallery { break-after: page; }
 .gallery-grid { display: block; }
 .shot { break-inside: avoid; margin: 0 0 6mm; }
-.shot img { width: 100%; border: 0.6pt solid #dfe7f4; border-radius: 4pt; }
-.shot figcaption { color: #6b7d99; font-size: 8pt; margin-top: 3pt; }
+.shot img {
+  max-height: 116mm; max-width: 100%; width: auto; display: block; margin: 0 auto;
+  border: 0.6pt solid #dfe7f4; border-radius: 4pt;
+}
+p > img {
+  display: block; width: 86%; margin: 9pt auto 3pt;
+  border: 0.6pt solid #dfe7f4; border-radius: 4pt;
+}
+.shot figcaption { color: #6b7d99; font-size: 8pt; margin-top: 3pt; text-align: center; }
 
 .note {
   background: #f7faff; border: 0.6pt solid #dfe7f4; border-radius: 4pt;
@@ -250,7 +257,7 @@ def build_html(markdown_text: str) -> str:
       <tr><td>Project report</td><td>Architecture, functions, libraries, problems and solutions, limitations</td></tr>
       <tr><td>Repository</td><td>github.com/Aabyyss/ScamShield-AI</td></tr>
       <tr><td>Stack</td><td>Python 3.14 · Streamlit · Ollama (Gemma 4 E2B) · RapidOCR/ONNX · SQLite</td></tr>
-      <tr><td>Status</td><td>Working end to end · 44 automated tests passing</td></tr>
+      <tr><td>Status</td><td>Working end to end · 47 automated tests passing</td></tr>
       <tr><td>Date</td><td>{today}</td></tr>
     </table>
     <div class="cover-foot">Student hackathon project. ScamShield gives guidance, not legal

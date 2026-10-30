@@ -66,6 +66,51 @@ def clear_result() -> None:
 # --------------------------------------------------------------------------------------
 
 
+def _persist_learning_toggle() -> None:
+    """Persist the Learning-tab switch only when the user actually moves it."""
+    learning.set_consent(bool(st.session_state.get("learning_toggle")))
+
+
+@st.dialog("🧠 Learning from this device — your call", width="large")
+def ask_learning_consent() -> None:
+    st.markdown(
+        """
+ScamShield can get better with use — but only if you allow it. **Nothing is recorded
+until you choose below.**
+
+**What is stored, in one file on this laptop**
+- the risk level and score of each message you check, and which rules fired;
+- a 64-bit fingerprint of the wording, so it can spot a near-duplicate later;
+- the corrections you make ("this was actually legitimate") and any phrases or domains you teach it.
+
+**What is never stored**
+- the text of the message — only the fingerprint, so the file cannot be read back as your chats;
+- CNIC, passport or account numbers (they are masked before they reach the screen);
+- anything sent anywhere. There is no account and no server.
+
+**We never read your WhatsApp.** ScamShield has no access to your chats or files. Learning only
+uses messages you paste or upload here, and the corrections you click.
+"""
+    )
+    st.markdown(
+        ui.note(
+            "You can change this later in the <strong>Learning</strong> tab, and clear the "
+            "store at any time."
+        ),
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    left, right = st.columns(2)
+    with left:
+        if st.button("Enable on-device learning", type="primary", use_container_width=True):
+            learning.set_consent(True)
+            st.rerun()
+    with right:
+        if st.button("Keep it off", use_container_width=True):
+            learning.set_consent(False)
+            st.rerun()
+
+
 @st.dialog("👋 How ScamShield works — 3 steps", width="large")
 def show_intro() -> None:
     st.markdown(
@@ -95,9 +140,11 @@ questions, and download the report so a friend doesn't fall for the same message
     with left:
         if st.button("Try a real scam message", type="primary", use_container_width=True):
             load_sample(SAMPLE_BY_KEY["dubai_hotel"].text)
+            st.session_state["intro_done"] = True
             st.rerun()
     with right:
         if st.button("Paste my own message", use_container_width=True):
+            st.session_state["intro_done"] = True
             st.rerun()
 
 
@@ -161,9 +208,24 @@ with st.sidebar:
         )
 
     st.divider()
-    if learning.available():
+    health = learning.store_health()
+    consent = learning.consent_choice()
+    st.markdown("#### 🧠 Learning")
+    if not health["ok"]:
+        st.markdown(
+            '<span class="ss-pill warn">● Learning store unavailable</span>',
+            unsafe_allow_html=True,
+        )
+        st.caption(f"Could not open `{health['path']}` — {health['error']}")
+    elif consent is None:
+        st.caption("Not asked yet — nothing is being recorded.")
+    elif consent is False:
+        st.markdown(
+            '<span class="ss-pill warn">● Learning is off</span>', unsafe_allow_html=True
+        )
+        st.caption("Nothing is stored. Turn it on in the **Learning** tab.")
+    else:
         learned = learning.feedback_summary()
-        st.markdown("#### 🧠 Learning")
         st.caption(
             f"{learning.verdict_count()} message(s) checked · {learned['total']} correction(s) · "
             f"{len(learning.phrases())} taught phrase(s)"
@@ -208,6 +270,12 @@ with header_right:
 if "seen_intro" not in st.session_state:
     st.session_state["seen_intro"] = True
     show_intro()
+elif learning.consent_choice() is None and (
+    st.session_state.get("intro_done") or st.session_state.get("spoken_once")
+):
+    # Second step of onboarding: nothing is recorded until the user answers this. It also
+    # appears if the user closed step one, or right after their first analysis.
+    ask_learning_consent()
 
 
 # --------------------------------------------------------------------------------------
@@ -537,20 +605,36 @@ with tab_scan:
         if not message.strip():
             st.toast("Paste a message first.")
         else:
-            # Phase 1 — deterministic verdict, available in milliseconds.
+            # Phase 1 — deterministic verdict, available in milliseconds. It is saved at once so
+            # the counters move while the model is still reading, instead of ninety seconds later.
             fast = engine.analyze(message, use_ai=False)
+            verdict_id = learning.record_verdict(message, fast)
+            saved = (
+                f"saved as scan #{verdict_id}"
+                if verdict_id is not None
+                else "learning is off, so this scan was not saved"
+            )
             with slot.container():
                 render_result(fast, message)
-            st.caption("⚡ Rules verdict above is already final on critical signals — the local AI is adding reasoning…")
+            st.caption(
+                f"⚡ Rules verdict saved on this laptop ({saved}) — the local AI is adding "
+                "its reasoning…"
+            )
+            if verdict_id is None and learning.learning_enabled():
+                st.warning(
+                    "This scan could not be saved to the local learning store, so the counters "
+                    "will not move. Verdicts still work; check the Learning tab for details."
+                )
 
             if use_ai and online:
                 with st.spinner("The local model is reading the message — nothing leaves this laptop…"):
                     full = engine.analyze(message, model=model, use_ai=True)
+                if verdict_id is not None:
+                    learning.update_verdict(verdict_id, full)
             else:
                 full = fast
-
-            verdict_id = learning.record_verdict(message, full)
             st.session_state["result"] = full
+            st.session_state["spoken_once"] = True
             st.session_state["verdict_id"] = verdict_id
             st.session_state["analyzed_text"] = message
             st.session_state.pop("feedback_msg", None)
@@ -638,6 +722,39 @@ with tab_how:
 
 with tab_learn:
     st.markdown("#### What ScamShield has learned on this machine")
+
+    health = learning.store_health()
+    consent = learning.consent_choice()
+    if not health["ok"]:
+        st.error(
+            f"The learning store could not be opened at `{health['path']}`: {health['error']}. "
+            "Verdicts still work; nothing is being remembered."
+        )
+    else:
+        # Keep the switch in step with the stored choice without the widget's own session
+        # value silently overriding a decision made elsewhere (that once turned learning off).
+        if st.session_state.get("consent_snapshot") != consent:
+            st.session_state["learning_toggle"] = consent is True
+            st.session_state["consent_snapshot"] = consent
+        toggle_col, path_col = st.columns([1, 2])
+        with toggle_col:
+            enabled = st.toggle(
+                "On-device learning",
+                help="Off means nothing is stored: no score history, no corrections, no phrases.",
+                key="learning_toggle",
+                on_change=_persist_learning_toggle,
+            )
+        with path_col:
+            st.caption(
+                "Only messages you paste here are remembered — ScamShield has no access to "
+                f"your WhatsApp or files. Store: `{health['path']}`"
+            )
+        if not enabled:
+            st.info(
+                "Learning is currently off, so every counter below stays at zero by design. "
+                "Turn it on to keep score history, corrections and taught phrases."
+            )
+
     summary = learning.feedback_summary()
     rules_learned = [row for row in learning.learned_rule_rows() if row["active"]]
     st.markdown(

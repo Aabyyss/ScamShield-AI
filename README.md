@@ -209,6 +209,14 @@ verified model findings.
 
 ## Self-learning, without retraining a model
 
+Nothing is recorded until you say yes. On first run a dialog asks for permission and lists exactly
+what is stored (risk level, score, which rules fired, a 64-bit fingerprint of the wording,
+your corrections and taught phrases) and what is never stored (the message text, CNIC or account
+numbers, anything leaving the machine). ScamShield has no access to your WhatsApp or files — it
+learns only from messages you paste or upload here. The choice is reversible from the **Learning**
+tab, and a scan is saved the moment the rules verdict appears, so the counters move immediately
+rather than after the model finishes.
+
 The **Learning** tab is the whole mechanism, visible and reversible:
 
 1. **Rule precision.** Every rule keeps two counters — how often messages it fired on were
@@ -271,6 +279,10 @@ lenient.**
 
 ![Onboarding dialog](screenshots/intro-dialog.png)
 
+*Consent for on-device learning — nothing is stored until this is answered:*
+
+![Learning consent dialog](screenshots/consent-dialog.png)
+
 *A scam verdict — every flag quotes the message:*
 
 ![Verdict in light mode](screenshots/verdict-light.png)
@@ -317,6 +329,7 @@ Three optimisations make the small model usable:
 | Sidebar says *Ollama offline* | Run `ollama serve`, then refresh the browser. |
 | Analysis returns instantly with a warning | The model failed or timed out; the verdict is rules-only and still correct. Try `gemma4:e2b`. |
 | Very slow first analysis | The model is loading (~16 s). The app warms it at startup. |
+| Learning counters stay at 0 | Learning was declined or never enabled. Check the **Learning** tab switch; the sidebar says which mode it is in. |
 | Learning tab is empty after a correction | A rule needs three labelled messages before its weight moves; that is by design. |
 | `AttributeError` in `dataclasses` after editing files | Streamlit hot-reloaded mid-import. Refresh; `runOnSave` is off for this reason. |
 
@@ -343,7 +356,7 @@ scamshield/
   samples.py                        demo corpus with expected verdicts
   cli.py                            terminal interface for testing the pipeline
 skills/job-scam-detector/SKILL.md   the Agent Skill: playbook, taxonomy, JSON contract
-tests/                              44 regression tests (rules, entities, learning, report, OCR)
+tests/                              47 regression tests (rules, entities, learning, report, OCR)
 screenshots/whatsapp-demo.png       ready-made scam screenshot for trying OCR
 .streamlit/config.toml              light base theme, telemetry off
 data/scamshield.db                  local learning store (git-ignored)

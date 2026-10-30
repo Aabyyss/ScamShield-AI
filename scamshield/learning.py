@@ -86,7 +86,14 @@ CREATE TABLE IF NOT EXISTS trusted_domains (
     created_at TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
+
+CONSENT_KEY = "learning_consent"
 
 _LEVELS = ("HIGH", "MEDIUM", "LOW")
 
@@ -134,6 +141,60 @@ def available() -> bool:
         return True
     except (sqlite3.Error, OSError):
         return False
+
+
+def store_health() -> dict:
+    """Whether the store is usable, and why not — so the UI never shows a silent zero."""
+    try:
+        _connect().close()
+    except (sqlite3.Error, OSError) as exc:
+        return {"ok": False, "path": str(db_path()), "error": str(exc)}
+    return {"ok": True, "path": str(db_path()), "error": ""}
+
+
+# --------------------------------------------------------------------------------------
+# Consent — nothing is recorded until the user says yes
+# --------------------------------------------------------------------------------------
+
+
+def _get_setting(key: str, default: str | None = None) -> str | None:
+    try:
+        with _session() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    except (sqlite3.Error, OSError):
+        return default
+    return row["value"] if row else default
+
+
+def _set_setting(key: str, value: str) -> bool:
+    try:
+        with _session() as conn:
+            conn.execute(
+                "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+                "updated_at = excluded.updated_at",
+                (key, value, _now()),
+            )
+    except (sqlite3.Error, OSError):
+        return False
+    return True
+
+
+def consent_choice() -> bool | None:
+    """None until the user has been asked, then the stored choice."""
+    value = _get_setting(CONSENT_KEY)
+    if value is None:
+        return None
+    return value == "on"
+
+
+def set_consent(enabled: bool) -> bool:
+    return _set_setting(CONSENT_KEY, "on" if enabled else "off")
+
+
+def learning_enabled() -> bool:
+    """Learning runs only after an explicit yes. Unasked means off for new installs."""
+    return consent_choice() is True
 
 
 # --------------------------------------------------------------------------------------
@@ -215,7 +276,12 @@ def similar_cases(text: str, max_distance: int = DEFAULT_SIMILARITY_DISTANCE, li
 
 
 def record_verdict(text: str, result) -> int | None:
-    """Store a scan so a later correction can be tied to the exact evidence that fired."""
+    """Store a scan so a later correction can be tied to the exact evidence that fired.
+
+    Returns the new row id, or None when learning is switched off or the write failed.
+    """
+    if not learning_enabled():
+        return None
     try:
         keys = ",".join(h.key for h in result.rule_hits)
         with _session() as conn:
@@ -235,6 +301,31 @@ def record_verdict(text: str, result) -> int | None:
             return int(cursor.lastrowid)
     except (sqlite3.Error, OSError):
         return None
+
+
+def update_verdict(verdict_id: int, result) -> bool:
+    """Replace a scan's level/score with the model-backed result, keeping one row per scan.
+
+    The rules verdict is stored the instant it renders so the counters move immediately; the
+    AI phase then refines the same row instead of adding a second one.
+    """
+    try:
+        with _session() as conn:
+            conn.execute(
+                "UPDATE verdicts SET level = ?, score = ?, rules = ?, engine = ?, model = ? "
+                "WHERE id = ?",
+                (
+                    result.risk_level,
+                    result.risk_score,
+                    ",".join(h.key for h in result.rule_hits),
+                    result.engine,
+                    result.model or "",
+                    verdict_id,
+                ),
+            )
+    except (sqlite3.Error, OSError):
+        return False
+    return True
 
 
 def verdict_count() -> int:

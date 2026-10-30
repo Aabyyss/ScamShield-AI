@@ -20,6 +20,8 @@ class LearningTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self._old_db = os.environ.get("SCAMSHIELD_DB")
         os.environ["SCAMSHIELD_DB"] = str(Path(self._tmp.name) / "learning.db")
+        # The app only writes after the user opts in; the tests do the same thing.
+        learning.set_consent(True)
 
     def tearDown(self) -> None:
         if self._old_db is None:
@@ -35,6 +37,28 @@ class LearningTests(unittest.TestCase):
         learning.record_feedback(
             verdict_id, result.risk_level, level, [hit.key for hit in result.rule_hits]
         )
+
+    def test_nothing_is_stored_without_consent(self) -> None:
+        learning.set_consent(False)
+        text = SAMPLE_BY_KEY["dubai_hotel"].text
+        result = engine.analyze(text, use_ai=False)
+        self.assertIsNone(learning.record_verdict(text, result))
+        self.assertEqual(learning.verdict_count(), 0)
+
+    def test_unasked_install_does_not_record(self) -> None:
+        learning.set_consent(True)
+        learning.clear_history()
+        with learning._session() as conn:  # simulate a brand-new install
+            conn.execute("DELETE FROM settings")
+        result = engine.analyze(SAMPLE_BY_KEY["dubai_hotel"].text, use_ai=False)
+        self.assertIsNone(learning.record_verdict(SAMPLE_BY_KEY["dubai_hotel"].text, result))
+        self.assertIsNone(learning.consent_choice())
+        self.assertFalse(learning.learning_enabled())
+
+    def test_store_health_reports_a_writable_path(self) -> None:
+        health = learning.store_health()
+        self.assertTrue(health["ok"])
+        self.assertIn("learning.db", health["path"])
 
     def test_one_correction_does_not_move_weights(self) -> None:
         self._label("borderline", "LOW")
