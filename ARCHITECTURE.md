@@ -29,6 +29,7 @@ For the design rationale, the full feature catalogue and the measured numbers, s
               └──────┬───────────────┬──────────────────────┘
                      │               │
         learning.py (SQLite)   report.py (Markdown)   cli.py (terminal)
+                               pdf.py (one-page PDF)
 ```
 
 The application is split so that the **verdict never depends on the model**. Scoring is
@@ -51,6 +52,7 @@ scamshield/
   learning.py              SQLite store, consent, Beta-smoothed weights, phrases, trust
   ocr.py                   RapidOCR (ONNX) screenshot reading, Tesseract fallback
   report.py                Markdown safety report builder
+  pdf.py                   One-page PDF verdict, written by hand against the PDF spec
   cli.py                   terminal interface (--sample, --json, --no-ai …)
   ui.py                    CSS theme, HTML components, result card
   samples.py               5-message demo corpus with expected verdicts
@@ -80,7 +82,7 @@ screenshots/               images used by the README and the report
 5. The model-backed result replaces the provisional one, `learning.update_verdict()` refines the
    same row (one scan = one row), and the UI reruns with the final verdict.
 6. The user may correct the verdict (`record_feedback()` moves bounded rule weights), download the
-   Markdown report, or start another message.
+   one-page PDF or the Markdown report, or start another message.
 
 If Ollama is missing, slow or returns unusable JSON, `_rules_only()` produces the same shaped
 `Analysis` with an explicit `error` note. The product never blocks on the model.
@@ -92,6 +94,7 @@ If Ollama is missing, slow or returns unusable JSON, `_rules_only()` produces th
 | `engine.py` | Orchestration, model I/O, verification, scoring, `Analysis`/`Flag` types | Contain detection patterns (those live in `rules.py`) |
 | `rules.py` | Regex families, weights, severity, `prescan()`, `rule_score()` floors | Call the network or the model |
 | `entities.py` | Structural judgement of links/mailboxes/numbers/IDs | Decide the overall verdict |
+| `pdf.py` | The one-page share artefact: layout, Latin-1 folding, raw PDF serialisation | Add a dependency, or draw anything the user did not paste |
 | `learning.py` | Local persistence, consent, weight multipliers, taught phrases | Retrain a model or talk to a server |
 | `ocr.py` | Image → text, with confidence and warnings | Analyse the text |
 | `report.py` | Markdown export from an `Analysis` | Read the DB or the UI |

@@ -63,6 +63,10 @@ Other public helpers: `engine.list_models()`, `engine.pick_model(available)`,
 | `learning.store_health()` | `{ok, path, error}` |
 | `ocr.extract(image_bytes)` | `OCRResult(text, engine, lines, duration_ms, warnings, mean_confidence)` |
 | `report.build_report(result, message)` | `str` — Markdown safety report |
+| `pdf.build_verdict_pdf(result, message="")` | `bytes` — a one-page A4 PDF (verdict, quoted flags, actions, reporting contacts). `message` is accepted for signature symmetry and deliberately not drawn |
+| `pdf.verdict_pdf_filename(result)` | `str` — `scamshield-<level>-<yyyymmdd-hhmm>.pdf` |
+| `pdf.build_whatsapp_text(result)` | `str` — plain-text caption to paste alongside the PDF |
+| `pdf.sanitize(text)` | `str` — folds text to Latin-1 for the built-in PDF fonts |
 
 Errors: `engine.EngineError` (model unreachable/unusable) and `ocr.OCRError` (image unreadable).
 Both are caught by the UI and shown as a readable message.

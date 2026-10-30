@@ -28,7 +28,7 @@ before touching persistence and [CONVENTIONS.md](CONVENTIONS.md) before writing 
 ## Commands
 
 ```bash
-python -m unittest discover -s tests -v     # 47 tests, keep them green
+python -m unittest discover -s tests -v     # 55 tests, keep them green
 python -m scamshield.cli --sample dubai_hotel --no-ai     # fast deterministic check
 python -m scamshield.cli --sample legit_offer --model gemma4:e2b   # real AI path (60-130 s)
 python launcher.py                          # app on 127.0.0.1:8501, reuses a running server

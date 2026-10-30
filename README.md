@@ -31,7 +31,7 @@ with Wi-Fi switched off.
 | **Instant first verdict** | The rules engine answers in under 0.1 s; the local model upgrades the explanation in place. |
 | **Screenshot input** | Only have a picture of the message? Local RapidOCR reads it on the device — no Tesseract install, no upload. |
 | **Link, mailbox and number checks** | Free mailboxes, look-alike brand domains, throwaway TLDs, shorteners, punycode, hidden digits — all offline. |
-| **A shareable report** | One click downloads a Markdown safety report with the quotes, so the next person doesn't pay. |
+| **A shareable report** | One click downloads a one-page PDF — verdict, quoted flags, next steps, reporting contacts — sized for a phone, so the next person doesn't pay. The full Markdown report is one click further. |
 | **It learns from you** | Correct a verdict and the rules that fired are re-weighted — bounded, visible, reversible. |
 | **Light and dark by design** | A hand-tuned bright theme for the projector and a dark one for the room; switch live in the sidebar. |
 | **Guided on first open** | A three-step welcome, quick example chips, and plain-language next actions instead of jargon. |
@@ -387,11 +387,12 @@ scamshield/
   engine.py                         Ollama client, JSON contract, merge logic, fallback
   learning.py                       SQLite feedback store, Beta weights, phrases, memory
   report.py                         shareable Markdown safety report
+  pdf.py                            one-page PDF verdict for forwarding on WhatsApp
   ui.py                             light + dark palettes, cards, ring, tables
   samples.py                        demo corpus with expected verdicts
   cli.py                            terminal interface for testing the pipeline
 skills/job-scam-detector/SKILL.md   the Agent Skill: playbook, taxonomy, JSON contract
-tests/                              47 regression tests (rules, entities, learning, report, OCR)
+tests/                              55 regression tests (rules, entities, learning, report, PDF, OCR)
 screenshots/whatsapp-demo.png       ready-made scam screenshot for trying OCR
 .streamlit/config.toml              light base theme, telemetry off
 data/scamshield.db                  local learning store (git-ignored)
@@ -432,7 +433,7 @@ Run the tests with `python -m unittest discover -s tests -v`.
 2. **Roman-Urdu patterns** (`paisay bhejain`, `visa guarantee`, `ghar baithe kamai`).
 3. **A local reputation cache** built from messages the user has already judged, labelled as
    cached and possibly stale.
-4. **One-page PDF** generated from the Markdown report for WhatsApp sharing.
+4. **A signed Windows build** — the current shortcut still assumes Python is installed.
 
 ## Ethics
 

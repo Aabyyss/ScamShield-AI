@@ -3,7 +3,7 @@
 Source of truth for progress. Update this file when work lands — it is what stops the next person
 (or agent) from re-doing finished work or re-opening settled decisions.
 
-**Status:** working end to end · 47 tests passing · submitted for the Agent Skills hackathon
+**Status:** working end to end · 55 tests passing · submitted for the Agent Skills hackathon
 (*Best use of Gemma 4*). Last updated: 30 October 2026.
 
 ---
@@ -36,6 +36,8 @@ Source of truth for progress. Update this file when work lands — it is what st
 - [x] Verdict card: score ring, quoted flags with attribution (RULE / RULE + AI), actions, questions
 - [x] Five tabs: Check a message · How it works · Learning · Compare · Agent Skill
 - [x] Markdown safety report export; feedback form ("this verdict is wrong")
+- [x] One-page PDF verdict (`pdf.py`, hand-written writer, no new dependency) plus a
+      paste-ready WhatsApp caption
 
 ### Screenshot input
 - [x] RapidOCR (ONNX) in-process, 1600 px upscale, EXIF rotation, 12 MB cap
@@ -45,14 +47,15 @@ Source of truth for progress. Update this file when work lands — it is what st
 - [x] One-click launcher, desktop shortcut for collaborators, logo/icon generation
 - [x] README, project report (`docs/`) and the generated PDF
 - [x] Project docs: ARCHITECTURE, DATABASE, API_SPEC, CONVENTIONS, GOTCHAS, TODO, .env.example
-- [x] 47 tests: rules, entities, learning, OCR, report
+- [x] 55 tests: rules, entities, learning, OCR, report, PDF
+- [x] Compare tab re-verified against each vendor's own pages (30 Oct 2026): Scamio is capped at
+      5 checks/day behind an account, Truecaller needs no account and has on-device Message ID,
+      ScamAdviser takes links and numbers rather than text
 
 ---
 
 ## In progress
 
-- [ ] **Verify the Compare tab's competitor claims** against each vendor's current documentation
-      before the demo. Every row needs a citable source; drop anything that cannot be sourced.
 - [ ] **Rehearse the demo flow** with Wi-Fi off: scam sample → quoted flags → genuine offer → LOW.
 
 ---
@@ -73,7 +76,6 @@ Source of truth for progress. Update this file when work lands — it is what st
 - [ ] Separate channel eval (WhatsApp vs email) and a real-screenshot OCR word-error rate
 
 ### Product
-- [ ] One-page PDF export of a verdict for WhatsApp sharing (the Markdown report exists)
 - [ ] Batch mode: paste several messages, get a triage list
 - [ ] Optional "explain like I'm new to job hunting" wording level
 - [ ] Rich-text paste that keeps the sender address / link context

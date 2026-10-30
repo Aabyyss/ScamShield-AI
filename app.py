@@ -15,6 +15,7 @@ from PIL import Image
 from scamshield import engine, learning, ocr, ui
 from scamshield.entities import domains_in
 from scamshield.engine import Analysis
+from scamshield.pdf import build_verdict_pdf, build_whatsapp_text, verdict_pdf_filename
 from scamshield.report import build_report, report_filename
 from scamshield.rules import RULES
 from scamshield.samples import SAMPLES
@@ -423,16 +424,34 @@ def render_result(result: Analysis, message: str, verdict_id: int | None = None)
                 unsafe_allow_html=True,
             )
 
-        report = build_report(result, message)
+        # One page, built on this laptop, for forwarding into the group chat where the scam arrived.
         st.download_button(
-            "⬇️ Download safety report",
-            data=report,
+            "⬇️ Download one-page PDF",
+            data=build_verdict_pdf(result, message),
+            file_name=verdict_pdf_filename(result),
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary",
+            key=f"pdf_{verdict_id or 'x'}",
+        )
+        st.download_button(
+            "Download full report (.md)",
+            data=build_report(result, message),
             file_name=report_filename(result),
             mime="text/markdown",
             use_container_width=True,
             key=f"dl_{verdict_id or 'x'}",
         )
-        st.caption("A shareable summary with the quotes — so the next person doesn't pay.")
+        st.caption(
+            "The PDF fits one page, so it stays readable on a phone — send it to whoever is "
+            "about to pay. It contains the quotes, not the whole conversation."
+        )
+        with st.expander("📋 Caption to send with it"):
+            st.code(build_whatsapp_text(result), language=None)
+            st.caption(
+                "Plain text for the message box. Nothing is posted anywhere — you copy and send it "
+                "yourself."
+            )
 
     with st.expander("🔬 Evidence and how this was scored", expanded=False):
         if result.rule_hits:
@@ -944,7 +963,8 @@ with tab_compare:
    rules are English-first.
 3. **A local reputation cache** — domains and numbers from messages the user has already judged,
    labelled as cached and possibly stale, never presented as live data.
-4. **A one-page PDF** built from the Markdown report, for sharing on WhatsApp.
+4. **A signed Windows build** — the shortcut works, but removing the Python prerequisite would
+   remove the last thing a non-technical user has to understand.
 """
     )
     st.markdown("##### Sources — checked 30 October 2026")

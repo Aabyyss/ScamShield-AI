@@ -68,7 +68,7 @@ Never swallow an error without either handling it or surfacing it to the user.
 - Learning tests must call `learning.set_consent(True)` first — nothing is written without consent.
 - Tests must not hit the network or require Ollama. The AI path is exercised with `use_ai=False`
   plus targeted guardrail tests.
-- Run: `python -m unittest discover -s tests -v` (47 tests, must stay green).
+- Run: `python -m unittest discover -s tests -v` (55 tests, must stay green).
 
 ## 5. UI
 

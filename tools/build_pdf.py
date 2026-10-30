@@ -30,6 +30,7 @@ SCREENSHOTS = [
     ("screenshots/intro-dialog.png", "Three-step onboarding dialog shown on first launch"),
     ("screenshots/verdict-light.png", "A scam verdict: score ring, quoted red flags and next steps"),
     ("screenshots/verdict-dark-final.png", "The same verdict in the dark theme"),
+    ("screenshots/verdict-export.png", "Export controls: the one-page PDF, the full Markdown report and a paste-ready caption"),
 ]
 
 CHROME_CANDIDATES = (
@@ -164,13 +165,13 @@ img { max-width: 100%; }
 
 .gallery { break-after: page; }
 .gallery-grid { display: block; }
-.shot { break-inside: avoid; margin: 0 0 6mm; }
+.shot { break-inside: avoid; margin: 0 0 4mm; }
 .shot img {
-  max-height: 116mm; max-width: 100%; width: auto; display: block; margin: 0 auto;
+  max-height: 76mm; max-width: 100%; width: auto; display: block; margin: 0 auto;
   border: 0.6pt solid #dfe7f4; border-radius: 4pt;
 }
 p > img {
-  display: block; width: 86%; margin: 9pt auto 3pt;
+  display: block; width: 86%; max-height: 92mm; object-fit: contain; margin: 9pt auto 3pt;
   border: 0.6pt solid #dfe7f4; border-radius: 4pt;
 }
 .shot figcaption { color: #6b7d99; font-size: 8pt; margin-top: 3pt; text-align: center; }
@@ -249,7 +250,7 @@ def build_html(markdown_text: str) -> str:
     <div class="cover-stats">
       <div><b>0</b><span>messages sent to a server — works with the Wi-Fi off</span></div>
       <div><b>12</b><span>rule families scoring the text, links, mailboxes and numbers</span></div>
-      <div><b>44</b><span>automated tests covering the engine, guardrails, OCR and learning</span></div>
+      <div><b>55</b><span>automated tests covering the engine, guardrails, PDF, OCR and learning</span></div>
     </div>
   </div>
   <div>
@@ -257,7 +258,7 @@ def build_html(markdown_text: str) -> str:
       <tr><td>Project report</td><td>Architecture, functions, libraries, problems and solutions, limitations</td></tr>
       <tr><td>Repository</td><td>github.com/Aabyyss/ScamShield-AI</td></tr>
       <tr><td>Stack</td><td>Python 3.14 · Streamlit · Ollama (Gemma 4 E2B) · RapidOCR/ONNX · SQLite</td></tr>
-      <tr><td>Status</td><td>Working end to end · 47 automated tests passing</td></tr>
+      <tr><td>Status</td><td>Working end to end · 55 automated tests passing</td></tr>
       <tr><td>Date</td><td>{today}</td></tr>
     </table>
     <div class="cover-foot">Student hackathon project. ScamShield gives guidance, not legal
@@ -276,7 +277,7 @@ def build_html(markdown_text: str) -> str:
       <div><dt>How it is built (§4 – §7)</dt><dd>Request lifecycle, every module, the rule
         taxonomy, and the stack with the reasons behind each choice.</dd></div>
       <div><dt>Why the verdict holds up (§8 – §11)</dt><dd>Guardrails against a small local
-        model, the learning maths, the 15 problems hit while building, and the tests.</dd></div>
+        model, the learning maths, the 19 problems hit while building, and the tests.</dd></div>
       <div><dt>Honest limits (§12 – §17)</dt><dd>What was measured, what was not, what the
         project cannot do, and what we would build next.</dd></div>
     </dl>

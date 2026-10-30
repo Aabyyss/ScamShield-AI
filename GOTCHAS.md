@@ -118,3 +118,23 @@ required" and "no offline" when its Scam Checker needs no account and its Messag
 on-device; ScamAdviser was marked "no phone lookup" when reverse lookup is a shipped feature. Always
 read the vendor's **terms and FAQ**, not just the marketing page, and never attribute a capability
 from a vendor's *other* product (Scamio was being credited with Bitdefender's Link Checker).
+
+## Rendering
+
+**21. A spacer block that reports a height but draws nothing keeps the cursor still.**
+In the PDF layout each block returned the next drawing position from its `draw()` call. Whitespace
+blocks were `Block(20, lambda c, top: top)` — measured as 20 pt, but drew nothing and returned the
+same cursor, so every section after the header was painted on top of the previous one. The page
+looked almost right, which is why the first render did not scream.
+→ Whitespace is now `_space(n)`, whose draw advances the cursor. Anything that contributes height
+must advance height, or measurement and drawing disagree.
+
+**22. A one-page layout has to be measured, fitted and anchored.**
+Composing the content once and hoping it fits gives either a second page (which defeats "one page")
+or a half-empty sheet when the verdict is short. `build_verdict_pdf` measures with real Helvetica
+metrics, tries candidate layouts in order, redistributes leftover space as spacing, and anchors the
+reporting block to the foot of the page.
+→ `tests/test_pdf.py` asserts exactly one `/Type /Page` for a 12-flag verdict *and* for a clean one.
+Two traps in the file format itself: `rsplit(b"xref")` is wrong because `startxref` contains the
+same word (split on `\nxref\n`), and the built-in fonts are WinAnsi, so fold the text to Latin-1
+first and escape `(`, `)` and `\` — an unescaped bracket in a quote corrupts the whole stream.
