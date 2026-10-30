@@ -110,5 +110,11 @@ It is a regression corpus for the rules, nothing more.
 that way until real, labelled messages exist.
 
 **20. Competitor claims must carry a date and a source.**
-The Compare tab cites each vendor's documentation (October 2026). If you add a row you cannot
-source, remove it rather than guessing — judges do ask.
+The Compare tab cites each vendor's documentation (checked 30 October 2026). If you add a row you
+cannot source, write "Not documented" rather than guessing — judges do ask.
+→ The first audit of this table found four wrong claims: Scamio was marked "free, unlimited" when
+its terms cap it at **5 checks/day** and require an account; Truecaller was marked "account
+required" and "no offline" when its Scam Checker needs no account and its Message ID runs
+on-device; ScamAdviser was marked "no phone lookup" when reverse lookup is a shipped feature. Always
+read the vendor's **terms and FAQ**, not just the marketing page, and never attribute a capability
+from a vendor's *other* product (Scamio was being credited with Bitdefender's Link Checker).

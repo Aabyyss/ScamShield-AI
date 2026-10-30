@@ -53,40 +53,55 @@ with Wi-Fi switched off.
 
 ### How it compares to consumer scam checkers
 
-Checked against each product's own documentation (October 2026):
+Each cell checked against that vendor's own product page, FAQ or terms on **30 October 2026**.
+“Not documented” means their pages do not say either way — it is not a guess in their favour.
 
 | Capability | Scamio | Norton Genie | ScamAdviser | Truecaller | ScamShield |
 |---|---|---|---|---|---|
-| Paste text → verdict | ✅ | ✅ | Partial | — | ✅ |
-| Screenshot input | ✅ | ✅ | ✅ | — | ✅ local OCR |
-| Link / domain checks | ✅ live | ✅ live | ✅ 40+ sources | ✅ live | Offline heuristics |
-| Phone number lookup | — | — | — | ✅ | Masked-number detector |
-| Works fully offline | ❌ | ❌ | ❌ | ❌ | ✅ |
-| No account or upload | ❌ | Partial | ❌ | ❌ | ✅ |
-| Quotes the trigger words | Partial | Partial | ❌ | ❌ | ✅ |
-| Learns from your corrections | ✅ vendor-side | ✅ vendor-side | ❌ | ✅ community | ✅ on-device |
-| Taught phrases / trusted domains | ❌ | ❌ | Partial (owners) | ❌ | ✅ |
-| Exportable report | ❌ | ❌ | ❌ | ❌ | ✅ Markdown |
+| Paste a message as text | ✅ | ✅ | ❌ links/numbers only | Partial — checks the link/number in it | ✅ |
+| Screenshot of a message | ✅ | ✅ | ✅ (Lens) | ❌ planned, not shipped | ✅ on-device OCR |
+| Checks links & domains | ✅ known-scam database | ✅ URL + domain checks | ✅ 40+ sources | ✅ live reputation | Offline heuristics |
+| Checks phone numbers | ❌ separate tool | ❌ separate feature | ✅ reverse lookup | ✅ core feature | Structure only |
+| Works with no network | ❌ | ❌ stated as required | ❌ | Partial — on-device Message ID | ✅ every feature |
+| Usable without an account | ❌ account required | Not documented | Not documented | ✅ | ✅ |
+| Free without a hard cap | ❌ 5 checks/day | ✅ no cap documented | Free tier + premium | ✅ rate-limited | ✅ |
+| Explains why, not just a label | Partial | ✅ | ✅ highlights, weights hidden | Bands only | ✅ with quotes |
+| Quotes the words that triggered it | ❌ | ❌ | ❌ | ❌ | ✅ verbatim |
+| Learns from user input | ✅ vendor-side | ✅ vendor-side | ❌ owner appeals instead | ✅ community reports | ✅ on-device |
+| Teach your own phrases / domains | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Share or export the result | ❌ | ❌ | ❌ | ✅ share link only | ✅ Markdown file |
 
 What those tools do better, and what we chose:
 
-- **Screenshots.** Scamio and Norton accept them; victims usually have one. ScamShield now
-  matches that with RapidOCR: the ONNX models ship inside the Python package, so
-  `pip install` is the only setup and the image never leaves the process. Printed text reads
-  well; handwriting and Urdu script still don't, and the app says so after each scan.
-- **Live reputation.** ScamAdviser, Truecaller and Scamio query maintained databases. That needs
-  the network, so ScamShield judges link *structure* offline and says plainly that reputation was
-  not checked.
-- **Uncertainty.** Norton Genie says when it cannot decide. ScamShield warns when a score sits
-  on a band boundary and never presents "no pattern found" as proof of legitimacy.
-- **In-app protection.** Google Messages and Truecaller act inside the messaging app. We can't;
-  the downloadable report is how a user warns the next person instead.
+- **Screenshots and messaging apps.** Scamio and Norton Genie read screenshots; Scamio also lives
+  inside WhatsApp, Messenger and Discord. We match the first with RapidOCR (ONNX models ship in
+  the package, the image never leaves the process). We cannot match the second — no messaging
+  integration, by design. Printed text reads well; handwriting and Urdu script still don't, and
+  the app says so after each scan.
+- **Live reputation.** ScamAdviser says 40+ sources, Truecaller uses community reports, Scamio
+  compares against known-scam databases, Genie does URL and domain checks — all needing a network.
+  ScamShield judges link *structure* offline and says plainly that reputation was not checked.
+- **Uncertainty.** Truecaller returns "Unknown" and Genie uses three-tier labels when unsure.
+  ScamShield warns when a score sits on a band boundary and never presents "no pattern found"
+  as proof of legitimacy.
+- **In-app protection.** Google Messages detects scams inside the app, on-device in standard mode.
+  But Google's own support page lists where Scam Detection is available — **Pakistan is not on
+  it**, which is precisely the gap this project fills.
+- **Cost and limits.** Scamio needs a Bitdefender account and stops after 5 checks a day. ScamShield
+  has no account, no cap and no per-check cost.
 
-Sources: [Bitdefender Scamio](https://www.bitdefender.com/en-us/consumer/scamio),
-[Norton Genie FAQ](https://support.norton.com/sp/de/de/home/current/solutions/v20230717145233467),
-[ScamAdviser algorithm](https://www.scamadviser.com/articles/scamadviser-algorithm-explainer),
-[Truecaller Scam Checker](https://www.truecaller.com/scam-checker),
-[Google Messages protection](https://support.google.com/messages/answer/9327903?hl=en),
+Sources (checked 30 October 2026):
+[Scamio product](https://www.bitdefender.com/en-us/consumer/scamio) ·
+[Scamio terms §4.5](https://www.bitdefender.com/en-us/site/view/subscription-agreement-and-terms-of-services-for-home-user-solutions) ·
+[Norton Genie FAQ](https://support.norton.com/sp/en/us/home/current/solutions/v20230717145233467) ·
+[Gen Digital newsroom, 4 Mar 2026](https://newsroom.gendigital.com/2026-03-04-The-Worlds-First-AI-Powered-Scam-Detector,-Norton-Genie,-Now-in-ChatGPT) ·
+[ScamAdviser about](https://www.scamadviser.com/about-scamadviser) ·
+[ScamAdviser algorithm](https://www.scamadviser.com/articles/scamadviser-algorithm-explainer) ·
+[ScamAdviser Lens](https://lens.scamadviser.com/) ·
+[Truecaller Scam Checker FAQ](https://www.truecaller.com/scam-checker/faq) ·
+[Truecaller Message ID](https://www.truecaller.com/message-id) ·
+[Google Messages protection](https://support.google.com/messages/answer/9327903?hl=en) ·
+[Google Scam Detection availability](https://support.google.com/android/answer/18633392?hl=en) ·
 [FTC job scams](https://consumer.ftc.gov/articles/job-scams).
 
 ---

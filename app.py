@@ -889,42 +889,49 @@ with tab_learn:
 with tab_compare:
     st.markdown("#### How ScamShield compares")
     st.caption(
-        "Capabilities checked against each tool's own documentation (October 2026). "
-        "“—” and “Offline” are deliberate product choices, not gaps we overlooked."
+        "Each cell checked against that vendor's own product page, FAQ or terms on 30 October "
+        "2026 — sources at the bottom of this tab. “Not documented” means the vendor's pages we "
+        "read do not say either way; we do not guess in their favour."
     )
     headers = ["Capability", "Scamio", "Norton Genie", "ScamAdviser", "Truecaller", "ScamShield"]
     rows = [
-        ["Paste text and get a verdict", "✅", "✅", "Partial", "—", "✅"],
-        ["Screenshot input", "✅", "✅", "✅", "—", "✅ local OCR"],
-        ["Link & domain checks", "✅ live", "✅ live", "✅ 40+ sources", "✅ live", "Offline heuristics"],
-        ["Phone number lookup", "—", "—", "—", "✅", "Masked-number detector"],
-        ["Works fully offline", "❌", "❌", "❌", "❌", "✅"],
-        ["No account or upload", "❌", "Partial", "❌", "❌", "✅"],
-        ["Quotes the exact trigger words", "Partial", "Partial", "❌", "❌", "✅"],
-        ["Explains the scoring", "Partial", "Partial", "✅", "❌", "✅ full audit"],
-        ["Learns from your corrections", "✅ vendor-side", "✅ vendor-side", "❌", "✅ community", "✅ on-device"],
-        ["Taught phrases / trusted domains", "❌", "❌", "Partial (owners)", "❌", "✅"],
-        ["Exportable report", "❌", "❌", "❌", "❌", "✅ Markdown"],
-        ["Free, unlimited checks", "✅", "✅", "Partial", "✅", "✅"],
+        ["Paste a message as text", "✅", "✅", "❌ links/numbers only", "Partial — checks the link/number in it", "✅"],
+        ["Screenshot of a message", "✅", "✅", "✅ (Lens)", "❌ planned, not shipped", "✅ on-device OCR"],
+        ["Checks links & domains", "✅ known-scam database", "✅ URL + domain checks", "✅ 40+ sources", "✅ live reputation", "Offline heuristics"],
+        ["Checks phone numbers", "❌ separate tool", "❌ separate feature", "✅ reverse lookup", "✅ core feature", "Structure only"],
+        ["Works with no network", "❌", "❌ stated as required", "❌", "Partial — on-device Message ID", "✅ every feature"],
+        ["Usable without an account", "❌ account required", "Not documented", "Not documented", "✅", "✅"],
+        ["Free without a hard cap", "❌ 5 checks/day", "✅ no cap documented", "Free tier + premium", "✅ rate-limited", "✅"],
+        ["Explains why, not just a label", "Partial", "✅", "✅ highlights, weights hidden", "Bands only", "✅ with quotes"],
+        ["Quotes the words that triggered it", "❌", "❌", "❌", "❌", "✅ verbatim"],
+        ["Learns from user input", "✅ vendor-side", "✅ vendor-side", "❌ owner appeals instead", "✅ community reports", "✅ on-device"],
+        ["Teach your own phrases / domains", "❌", "❌", "❌", "❌", "✅"],
+        ["Share or export the result", "❌", "❌", "❌", "✅ share link only", "✅ Markdown file"],
     ]
     st.markdown(ui.table(headers, rows), unsafe_allow_html=True)
 
     st.markdown("##### What they do better — and what we did about it")
     st.markdown(
         """
-- **Scamio and Norton accept screenshots.** We now match that with RapidOCR: models ship inside
-  the package, so `pip install` is the only setup and the image never leaves the process. Printed
-  text reads well; handwriting and Urdu script still don't, and the app says so after each scan.
-- **Scamio, ScamAdviser and Truecaller check live reputation.** That needs the network. Instead
-  ScamShield analyses the *structure* of every link, mailbox and number offline — free mailbox,
-  look-alike brand domain, disposable TLD, punycode, hidden digits — and says plainly that
-  reputation was not checked.
-- **ScamAdviser lets a site owner appeal a score.** We turned that into user correction:
-  every verdict can be challenged, and the affected rule's weight moves, visibly.
-- **Norton Genie says when it cannot decide.** We added band-boundary warnings, separate
-  "flagged" vs "confirmed" language, and a confidence field that the scoring cannot fake.
-- **Google Messages and Truecaller act inside the app.** We cannot: no messaging integration.
-  Instead the report is downloadable so the user can warn the next person themselves.
+- **Scamio and Norton Genie read screenshots**, and Scamio lives inside WhatsApp, Messenger and
+  Discord. We match the first with RapidOCR (models ship in the package, the image never leaves
+  the process); we cannot match the second — no messaging integration, by design.
+- **All four check reputation online.** ScamAdviser says 40+ sources, Truecaller uses community
+  reports, Scamio compares against known-scam databases, Genie does URL and domain checks. That
+  needs a network. ScamShield judges *structure* instead — free mailbox, look-alike brand domain,
+  disposable TLD, punycode, hidden digits — and states plainly that reputation was not checked.
+- **Two of them name an uncertain outcome** (Truecaller's “Unknown”, Genie's three-tier labels).
+  We added band-boundary warnings, “flagged” vs “confirmed” wording, and a confidence field the
+  score cannot fake.
+- **ScamAdviser lets a site owner appeal a score, free of charge.** We turned that idea into user
+  correction: any verdict can be challenged and the affected rule's weight moves, visibly.
+- **Truecaller runs its SMS fraud detection on-device** (Message ID, Android) — the closest thing
+  to our offline claim. But it labels SMS, not job offers, and does not quote the trigger words.
+- **Google Messages detects scams inside the app**, on-device in standard mode — yet Google's own
+  support page lists the countries where Scam Detection is available, and Pakistan is not on it.
+  That gap is the reason this project exists.
+- **Upfront cost:** Scamio needs a Bitdefender account and stops after 5 checks a day. ScamShield
+  has no account, no cap, and no per-check cost.
 """
     )
 
@@ -940,10 +947,15 @@ with tab_compare:
 4. **A one-page PDF** built from the Markdown report, for sharing on WhatsApp.
 """
     )
+    st.markdown("##### Sources — checked 30 October 2026")
     st.caption(
-        "Sources: Bitdefender Scamio product & FAQ pages, Norton Genie FAQ, ScamAdviser algorithm "
-        "explainer, Truecaller Scam Checker, Google Messages protection documentation, FTC job-scam "
-        "guidance. Full links are in the README."
+        "Scamio: product page + FAQ, and the home subscription terms (§4.5: 5 checks/day, account "
+        "required) · Norton Genie: support FAQ (screenshot upload, “and why”, internet required) "
+        "and Gen Digital newsroom, 4 Mar 2026 · ScamAdviser: about page, algorithm explainer “40+ "
+        "data sources”, Lens, claim-your-site · Truecaller: Scam Checker FAQ (no account, share "
+        "link), Message ID (on-device SMS, Android), Scam Checker launch release · Google: "
+        "Messages spam & scam protection, and the Scam Detection availability list · FTC: Job "
+        "Scams, “Job offer text? Probably a scam”. Full URLs are in the README."
     )
 
 

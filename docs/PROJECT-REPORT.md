@@ -50,7 +50,7 @@ those two jobs is what makes the verdict defensible.
 | **Who** | Students and fresh graduates in Pakistan, often first-time job seekers, using WhatsApp as their main channel |
 | **What happens** | A recruiter offers an overseas job, then asks for a visa/processing/medical fee. A second variant harvests passport, CNIC and bank details. A third is the "daily earning task" scam that extracts deposits. |
 | **Why it works** | The sums are small enough to feel plausible (Rs 1,000–35,000), the promise is large, the deadline is short, and there is no easy way to check a foreign employer |
-| **Why existing tools fail them** | Cloud scam checkers require uploading sensitive text; Pakistani-specific signals (JazzCash, EasyPaisa, CNIC, "visa stamping") are poorly covered; general chatbots produce confident prose without evidence |
+| **Why existing tools fail them** | Cloud scam checkers require uploading sensitive text; Pakistani-specific signals (JazzCash, EasyPaisa, CNIC, "visa stamping") are poorly covered; general chatbots produce confident prose without evidence; and Google Messages' own Scam Detection is not available in Pakistan — Google's support page lists the supported countries and Pakistan is absent |
 | **Cost of a false negative** | Entire savings, plus identity theft from shared documents |
 | **Cost of a false positive** | A real job opportunity is lost, and the user stops trusting the tool |
 
@@ -581,12 +581,18 @@ without any setup.
 
 ## 17. References
 
-- Bitdefender Scamio — product and FAQ pages: <https://www.bitdefender.com/en-us/consumer/scamio>
-- Norton Genie FAQ: <https://support.norton.com/sp/de/de/home/current/solutions/v20230717145233467>
-- ScamAdviser algorithm explainer: <https://www.scamadviser.com/articles/scamadviser-algorithm-explainer>
-- Truecaller Scam Checker: <https://www.truecaller.com/scam-checker>
-- Google Messages scam protection: <https://support.google.com/messages/answer/9327903>
-- FTC job-scam guidance: <https://consumer.ftc.gov/articles/job-scams>
+Competitor capabilities were checked against each vendor's own pages on 30 October 2026:
+
+- Bitdefender Scamio — product page: <https://www.bitdefender.com/en-us/consumer/scamio> · terms (5 checks/day, account required, §4.5): <https://www.bitdefender.com/en-us/site/view/subscription-agreement-and-terms-of-services-for-home-user-solutions>
+- Norton Genie FAQ (screenshot upload, "and why", internet required): <https://support.norton.com/sp/en/us/home/current/solutions/v20230717145233467>
+- Norton Genie in ChatGPT, Gen Digital newsroom, 4 March 2026: <https://newsroom.gendigital.com/2026-03-04-The-Worlds-First-AI-Powered-Scam-Detector,-Norton-Genie,-Now-in-ChatGPT>
+- ScamAdviser — about and the "40+ data sources" explainer: <https://www.scamadviser.com/about-scamadviser> · <https://www.scamadviser.com/articles/scamadviser-algorithm-explainer>
+- ScamAdviser Lens (screenshot input) and site-owner claims: <https://lens.scamadviser.com/> · <https://www.scamadviser.com/claim-your-site>
+- Truecaller Scam Checker FAQ (free, no account, share a result): <https://www.truecaller.com/scam-checker/faq>
+- Truecaller Message ID (on-device SMS fraud detection, Android): <https://www.truecaller.com/message-id>
+- Google Messages spam and scam protection: <https://support.google.com/messages/answer/9327903>
+- Google Scam Detection availability list (Pakistan absent): <https://support.google.com/android/answer/18633392>
+- FTC job-scam guidance and the 2026 job-offer-text alert: <https://consumer.ftc.gov/articles/job-scams> · <https://consumer.ftc.gov/consumer-alerts/2026/04/job-offer-text-probably-scam>
 - Beta-binomial smoothing reference: <https://bookdown.org/kevin_davisross/stat415-handouts/beta-binomial.html>
 - RapidOCR: <https://github.com/RapidAI/RapidOCR>
 - Ollama API: <https://github.com/ollama/ollama/blob/main/docs/api.md>
