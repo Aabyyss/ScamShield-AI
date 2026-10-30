@@ -1,0 +1,16 @@
+# Cursor rules for ScamShield AI
+# The authoritative instruction set lives in CLAUDE.md so every agent reads one file.
+# Read these before editing, in order:
+#   1. CLAUDE.md      — invariants, commands, definition of done
+#   2. TODO.md        — what is done / in progress / backlog
+#   3. GOTCHAS.md     — bugs that must not be re-introduced
+#   4. ARCHITECTURE.md, DATABASE.md, API_SPEC.md, CONVENTIONS.md
+
+Hard rules (duplicated here only because they are the ones most often broken):
+- Nothing may reach the network except the local Ollama server at OLLAMA_HOST (loopback).
+- The rules engine decides the score; the language model only explains. Never move scoring into
+  the prompt, and never relax quote verification or the no-fee polarity check.
+- Every red flag must quote the message verbatim. No quote, no flag.
+- Nothing is written to the SQLite store without user consent (learning.learning_enabled()).
+- Do not claim accuracy or precision from the 5-message demo corpus; it is a regression suite.
+- Run `python -m unittest discover -s tests` before finishing; keep all 47 tests green.

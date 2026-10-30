@@ -8,6 +8,7 @@
 
 > **Full write-up:** [docs/PROJECT-REPORT.md](docs/PROJECT-REPORT.md) — architecture, every
 > library, the real bugs and how they were fixed, measurements and honest limitations.
+> **PDF for submission:** [docs/ScamShield-AI-Project-Report.pdf](docs/ScamShield-AI-Project-Report.pdf)
 
 ScamShield is an offline AI agent that reads suspicious job messages (WhatsApp forwards,
 recruiter DMs, hiring emails) and returns a risk verdict with the exact red flags quoted from
@@ -333,6 +334,20 @@ Three optimisations make the small model usable:
 | Learning tab is empty after a correction | A rule needs three labelled messages before its weight moves; that is by design. |
 | `AttributeError` in `dataclasses` after editing files | Streamlit hot-reloaded mid-import. Refresh; `runOnSave` is off for this reason. |
 
+## Project documentation
+
+| File | What it answers |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Folder layout, layers, request lifecycle, what each module owns, extension points |
+| [DATABASE.md](DATABASE.md) | Every table, relation and index; what is deliberately *not* stored; reset operations |
+| [API_SPEC.md](API_SPEC.md) | The Python API, CLI flags, and the Ollama contract + JSON schema the model must satisfy |
+| [CONVENTIONS.md](CONVENTIONS.md) | Naming, typing, error handling, test style, UI copy rules, dependency policy |
+| [GOTCHAS.md](GOTCHAS.md) | 20 real bugs (Gemma 4's `thinking` field, OCR word collapse, SQLite handles…) and the fixes |
+| [TODO.md](TODO.md) | Done / in progress / backlog, and what is explicitly not planned |
+| [CLAUDE.md](CLAUDE.md) | Agent instructions: invariants, commands, definition of done |
+| [.env.example](.env.example) | The three environment variables (there are no API keys) |
+| [docs/PROJECT-REPORT.md](docs/PROJECT-REPORT.md) | The full technical report, also as a PDF |
+
 ## Project layout
 
 ```
@@ -345,6 +360,11 @@ assets/                             logo, page icon and multi-size .ico
 tools/make_logo.py                  regenerates the logo and icon from code
 tools/create_shortcut.ps1           Windows shortcut creation with the custom icon
 docs/PROJECT-REPORT.md              full technical report
+docs/ScamShield-AI-Project-Report.pdf   the same report, built for submission
+ARCHITECTURE.md · DATABASE.md · API_SPEC.md · CONVENTIONS.md · GOTCHAS.md · TODO.md
+                                     project docs (see the index above)
+CLAUDE.md · .cursorrules            agent instructions for this workspace
+.env.example                        environment template (no secrets exist)
 scamshield/
   rules.py                          12 deterministic fraud families + scoring
   entities.py                       offline link / mailbox / phone / ID analysis
